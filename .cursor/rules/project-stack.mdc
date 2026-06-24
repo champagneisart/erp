@@ -1,0 +1,15 @@
+---
+description: Stack en conventies Champagne is Art Studio
+alwaysApply: true
+---
+
+# Project stack
+
+- Next.js App Router, TypeScript, Tailwind
+- Drizzle ORM + Turso (@libsql/client)
+- Auth.js voor login (admin/staff/artist)
+- Vercel Blob voor bestanden
+- Statussen alleen uit `src/lib/constants/statuses.ts`
+- AI alleen via `src/lib/ai/*`
+- Server Actions in `src/lib/actions/*`
+- Geen mockdata in productiecomponenten

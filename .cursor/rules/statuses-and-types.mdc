@@ -1,0 +1,11 @@
+---
+description: Statussen en transities
+globs: src/**/*.ts,src/**/*.tsx
+alwaysApply: false
+---
+
+# Statussen
+
+Gebruik altijd `LEAD_STATUSES`, `ORDER_STATUSES`, `canLeadTransition`, `canOrderTransition` uit `@/lib/constants/statuses`.
+
+Nieuwe statussen: eerst constants, dan schema indien nodig, dan UI.

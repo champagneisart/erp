@@ -1,0 +1,12 @@
+---
+description: AI service laag
+globs: src/lib/ai/**,src/lib/actions/inbox.ts
+alwaysApply: false
+---
+
+# AI
+
+- Geen OpenAI/AI calls vanuit React components
+- Nieuwe AI-gedrag via functies in `src/lib/ai/index.ts`
+- Conceptantwoorden: draft-only, staff keurt goed in inbox
+- Agents (later) zijn wrappers om deze functies
