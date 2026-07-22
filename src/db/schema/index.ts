@@ -65,6 +65,10 @@ export const orders = pgTable("orders", {
   deadline: text("deadline"),
   status: text("status").notNull().default("awaiting_customer_info"),
   artistUserId: integer("artist_user_id").references(() => users.id),
+  inventoryLocationId: integer("inventory_location_id").references(
+    () => inventoryLocations.id
+  ),
+  stockDeductedAt: text("stock_deducted_at"),
   fulfillment: text("fulfillment", { enum: ["pickup", "ship"] }),
   invoiceStatus: text("invoice_status").notNull().default("not_sent"),
   trackingNumber: text("tracking_number"),
@@ -125,6 +129,8 @@ export const artistOrderEvents = pgTable("artist_order_events", {
 export const products = pgTable("products", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
+  brand: text("brand"),
+  format: text("format"),
   sku: text("sku"),
   type: text("type", {
     enum: [
@@ -136,6 +142,18 @@ export const products = pgTable("products", {
       "material",
     ],
   }).notNull(),
+  purchasePriceExVat: text("purchase_price_ex_vat"),
+  sellPriceExVat: text("sell_price_ex_vat"),
+  sellPriceIncVat: text("sell_price_inc_vat"),
+  createdAt: text("created_at").notNull().default(ts),
+});
+
+export const inventoryLocations = pgTable("inventory_locations", {
+  id: serial("id").primaryKey(),
+  slug: text("slug").notNull().unique(),
+  name: text("name").notNull(),
+  locationType: text("location_type", { enum: ["office", "artist"] }).notNull(),
+  artistUserId: integer("artist_user_id").references(() => users.id),
   createdAt: text("created_at").notNull().default(ts),
 });
 
@@ -143,11 +161,34 @@ export const inventory = pgTable("inventory", {
   id: serial("id").primaryKey(),
   productId: integer("product_id")
     .notNull()
-    .unique()
     .references(() => products.id, { onDelete: "cascade" }),
+  locationId: integer("location_id")
+    .notNull()
+    .references(() => inventoryLocations.id, { onDelete: "cascade" }),
   quantity: integer("quantity").notNull().default(0),
   reserved: integer("reserved").notNull().default(0),
   minimum: integer("minimum").notNull().default(0),
+  updatedAt: text("updated_at").notNull().default(ts),
+});
+
+export const supplierOrders = pgTable("supplier_orders", {
+  id: serial("id").primaryKey(),
+  productId: integer("product_id")
+    .notNull()
+    .references(() => products.id),
+  supplierName: text("supplier_name"),
+  orderReference: text("order_reference"),
+  quantityOrdered: integer("quantity_ordered").notNull(),
+  quantityReceived: integer("quantity_received").notNull().default(0),
+  destinationLocationId: integer("destination_location_id")
+    .notNull()
+    .references(() => inventoryLocations.id),
+  status: text("status").notNull().default("ordered"),
+  trackingNumber: text("tracking_number"),
+  expectedDeliveryDate: text("expected_delivery_date"),
+  notes: text("notes"),
+  verifiedAt: text("verified_at"),
+  createdAt: text("created_at").notNull().default(ts),
   updatedAt: text("updated_at").notNull().default(ts),
 });
 
@@ -156,9 +197,13 @@ export const inventoryMovements = pgTable("inventory_movements", {
   productId: integer("product_id")
     .notNull()
     .references(() => products.id),
+  locationId: integer("location_id").references(() => inventoryLocations.id),
+  locationFromId: integer("location_from_id").references(() => inventoryLocations.id),
+  locationToId: integer("location_to_id").references(() => inventoryLocations.id),
   orderId: integer("order_id").references(() => orders.id),
+  supplierOrderId: integer("supplier_order_id").references(() => supplierOrders.id),
   movementType: text("movement_type", {
-    enum: ["reserve", "release", "consume", "adjust"],
+    enum: ["reserve", "release", "consume", "adjust", "transfer", "receive"],
   }).notNull(),
   quantity: integer("quantity").notNull(),
   note: text("note"),

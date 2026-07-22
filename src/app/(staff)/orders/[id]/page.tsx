@@ -5,10 +5,12 @@ import {
   activityLog,
   customers,
   orders,
+  products,
   statusPageTokens,
   users,
   workInstructions,
 } from "@/db/schema";
+import { checkArtistStock, getAllProducts } from "@/lib/actions/inventory";
 import {
   assignArtist,
   generateStatusLink,
@@ -50,6 +52,16 @@ export default async function OrderDetailPage({
     .limit(1);
 
   const artists = await db.select().from(users).where(eq(users.role, "artist"));
+  const allProducts = await getAllProducts();
+  const [selectedProduct] = order.productId
+    ? await db.select().from(products).where(eq(products.id, order.productId)).limit(1)
+    : [undefined];
+
+  const stockCheck =
+    order.productId && order.artistUserId
+      ? await checkArtistStock(order.productId, order.artistUserId, order.quantity)
+      : null;
+
   const tokens = await db
     .select()
     .from(statusPageTokens)
@@ -71,15 +83,31 @@ export default async function OrderDetailPage({
         Klant: {customer.name} — {order.theme}
       </p>
 
+      {stockCheck && !stockCheck.ok && (
+        <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-4 text-sm text-amber-200">
+          Voorraadtekort bij kunstenaar: {stockCheck.available} beschikbaar,{" "}
+          {stockCheck.needed} nodig voor deze order. Er is automatisch een taak aangemaakt
+          zodra je naar &quot;in_productie&quot; gaat.
+        </div>
+      )}
+
+      {order.stockDeductedAt && (
+        <p className="text-sm text-muted">
+          Voorraad afgeboekt bij kunstenaar op {order.stockDeductedAt.slice(0, 10)}
+        </p>
+      )}
+
       <Card>
         <CardHeader>
-          <CardTitle>Ordergegevens</CardTitle>
+          <CardTitle>Fles & ordergegevens</CardTitle>
         </CardHeader>
         <CardContent>
           <form
             action={async (fd) => {
               "use server";
+              const productId = fd.get("productId") as string;
               await updateOrder(orderId, {
+                productId: productId ? Number(productId) : null,
                 theme: (fd.get("theme") as string) || undefined,
                 bottleFormat: (fd.get("bottleFormat") as string) || undefined,
                 quantity: Number(fd.get("quantity")),
@@ -92,8 +120,29 @@ export default async function OrderDetailPage({
             }}
             className="grid max-w-lg gap-3"
           >
-            <Input name="theme" defaultValue={order.theme ?? ""} />
-            <Input name="bottleFormat" defaultValue={order.bottleFormat ?? ""} />
+            <label className="text-sm text-muted">Fles type</label>
+            <select
+              name="productId"
+              defaultValue={order.productId ?? ""}
+              className="h-10 rounded-md border border-gold/25 bg-background px-3 text-sm"
+            >
+              <option value="">— Kies fles —</option>
+              {allProducts.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.brand ? `${p.brand} — ` : ""}
+                  {p.name} {p.format ? `(${p.format})` : ""}
+                  {p.sellPriceIncVat ? ` · €${p.sellPriceIncVat}` : ""}
+                </option>
+              ))}
+            </select>
+            {selectedProduct && (
+              <p className="text-xs text-muted">
+                Inkoop: €{selectedProduct.purchasePriceExVat ?? "?"} excl. · Verkoop: €
+                {selectedProduct.sellPriceIncVat ?? "?"} incl.
+              </p>
+            )}
+            <Input name="theme" placeholder="Thema" defaultValue={order.theme ?? ""} />
+            <Input name="bottleFormat" placeholder="Formaat (optioneel)" defaultValue={order.bottleFormat ?? selectedProduct?.format ?? ""} />
             <Input name="quantity" type="number" defaultValue={order.quantity} />
             <Input name="deadline" type="date" defaultValue={order.deadline?.slice(0, 10) ?? ""} />
             <select

@@ -3,7 +3,7 @@
 import { asc, eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
-import { artistOrderEvents, orders } from "@/db/schema";
+import { artistOrderEvents, orders, products, workInstructions } from "@/db/schema";
 import { auth } from "@/lib/auth";
 
 export async function addArtistEvent(
@@ -38,8 +38,14 @@ export async function addArtistEvent(
 
 export async function getArtistOrders(userId: number) {
   return db
-    .select()
+    .select({
+      order: orders,
+      product: products,
+      workInstruction: workInstructions,
+    })
     .from(orders)
+    .leftJoin(products, eq(products.id, orders.productId))
+    .leftJoin(workInstructions, eq(workInstructions.orderId, orders.id))
     .where(eq(orders.artistUserId, userId))
     .orderBy(asc(orders.deadline));
 }

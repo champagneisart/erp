@@ -17,7 +17,7 @@ import {
   type OrderStatus,
 } from "@/lib/constants/statuses";
 import { logActivity } from "@/lib/actions/log";
-import { reserveInventoryForOrder, consumeInventoryForOrder } from "@/lib/actions/inventory";
+import { deductForOrder } from "@/lib/actions/inventory";
 
 export async function updateOrder(
   id: number,
@@ -27,6 +27,7 @@ export async function updateOrder(
     quantity: number;
     deadline: string;
     fulfillment: "pickup" | "ship";
+    productId: number | null;
     artistUserId: number | null;
     expectedReadyDate: string;
     invoiceStatus: "not_sent" | "sent" | "paid" | "overdue";
@@ -60,11 +61,22 @@ export async function updateOrderStatus(id: number, status: OrderStatus) {
     .set({ status, updatedAt: new Date().toISOString() })
     .where(eq(orders.id, id));
 
-  if (status === "input_complete" && order.productId) {
-    await reserveInventoryForOrder(id, order.productId, order.quantity);
-  }
-  if (status === "completed" && order.productId) {
-    await consumeInventoryForOrder(id, order.productId, order.quantity);
+  if (status === "in_production" && order.productId && order.artistUserId && !order.stockDeductedAt) {
+    const result = await deductForOrder(
+      id,
+      order.productId,
+      order.quantity,
+      order.artistUserId
+    );
+    if (result.success) {
+      await db
+        .update(orders)
+        .set({
+          stockDeductedAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        })
+        .where(eq(orders.id, id));
+    }
   }
 
   await logActivity({

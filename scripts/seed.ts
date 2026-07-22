@@ -53,14 +53,47 @@ async function main() {
 
   const [product] = await db
     .insert(schema.products)
-    .values({ name: "Magnum standaard", type: "magnum", sku: "MAG-01" })
+    .values({
+      name: "Magnum standaard",
+      brand: "René Schloess",
+      format: "1,5L",
+      type: "magnum",
+      sku: "MAG-01",
+      purchasePriceExVat: "70.00",
+      sellPriceExVat: "289.26",
+      sellPriceIncVat: "350.00",
+    })
+    .returning();
+
+  const [office] = await db
+    .insert(schema.inventoryLocations)
+    .values({ slug: "office", name: "Kantoor", locationType: "office" })
+    .returning();
+
+  const [artistLoc] = await db
+    .insert(schema.inventoryLocations)
+    .values({
+      slug: "artist-2",
+      name: "Bij Studio Kunstenaar",
+      locationType: "artist",
+      artistUserId: 2,
+    })
     .returning();
 
   await db.insert(schema.inventory).values({
     productId: product.id,
+    locationId: office.id,
     quantity: 50,
     reserved: 0,
     minimum: 5,
+  });
+
+  await db.insert(schema.inventory).values({
+    productId: product.id,
+    locationId: artistLoc.id,
+    quantity: 12,
+    reserved: 0,
+    minimum: 3,
   });
 
   const [order] = await db

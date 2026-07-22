@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { formatDate } from "@/lib/utils";
+
 export default async function ArtistPortalPage() {
   const session = await auth();
   if (!session?.user?.id) redirect("/login");
@@ -34,13 +35,35 @@ export default async function ArtistPortalPage() {
         {artistOrders.length === 0 && (
           <p className="text-stone-600">Geen orders toegewezen.</p>
         )}
-        {artistOrders.map((order) => (
+        {artistOrders.map(({ order, product, workInstruction }) => (
           <Card key={order.id}>
             <CardHeader>
               <CardTitle className="text-lg">{order.orderNumber}</CardTitle>
+              {product && (
+                <p className="text-sm font-medium text-stone-800">
+                  {product.brand ? `${product.brand} — ` : ""}
+                  {product.name}
+                  {product.format ? ` (${product.format})` : ""} × {order.quantity}
+                </p>
+              )}
               <p className="text-sm text-stone-600">
-                {order.theme} — deadline {formatDate(order.deadline)}
+                {order.theme ?? workInstruction?.theme ?? "Geen thema"} — deadline{" "}
+                {formatDate(order.deadline)}
               </p>
+              {workInstruction && (
+                <div className="mt-2 rounded-md bg-stone-50 p-3 text-sm text-stone-700">
+                  <p className="font-medium">Werkbon</p>
+                  {workInstruction.colorScheme && (
+                    <p>Kleuren: {workInstruction.colorScheme}</p>
+                  )}
+                  {workInstruction.textContent && (
+                    <p>Tekst: {workInstruction.textContent}</p>
+                  )}
+                  {workInstruction.frontDesign && (
+                    <p>Voorkant: {workInstruction.frontDesign}</p>
+                  )}
+                </div>
+              )}
               <Badge>{order.status}</Badge>
             </CardHeader>
             <CardContent className="flex flex-wrap gap-2">

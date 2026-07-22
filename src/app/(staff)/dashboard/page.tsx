@@ -82,8 +82,9 @@ export default async function DashboardPage() {
               <p className="text-sm text-muted">Voorraad OK</p>
             )}
             {lowStock.map((row) => (
-              <p key={row.product.id} className="text-sm text-foreground">
-                {row.product.name}: {row.inv.quantity - row.inv.reserved} vrij
+              <p key={`${row.location.id}-${row.product.id}`} className="text-sm text-foreground">
+                {row.product.name} ({row.location.name}):{" "}
+                {row.inv.quantity - row.inv.reserved} vrij
               </p>
             ))}
           </CardContent>
