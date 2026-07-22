@@ -2,6 +2,8 @@ import { isFormType, type FormType } from "@/lib/webhooks/form-types";
 
 export type NormalizedFormData = {
   formType: FormType;
+  formId?: string;
+  formName?: string;
   name?: string;
   email?: string;
   phone?: string;
@@ -168,6 +170,8 @@ export function normalizeFormPayload(
 
   const data: NormalizedFormData = {
     formType,
+    formId: flat.form_id ?? flat.fusion_form_id ?? flat.formid,
+    formName: flat.form_name ?? flat.form_title ?? flat.form_naam,
     extra: {},
     raw: flat,
   };

@@ -5,10 +5,22 @@ export const LEAD_STATUSES = [
   "offer_sent",
   "approved",
   "converted",
+  "overig",
   "cancelled",
 ] as const;
 
 export type LeadStatus = (typeof LEAD_STATUSES)[number];
+
+export const LEAD_STATUS_LABELS: Record<LeadStatus, string> = {
+  new: "Nieuw",
+  missing_info: "Info ontbreekt",
+  quote_sent: "Indicatie verstuurd",
+  offer_sent: "Offerte verstuurd",
+  approved: "Goedgekeurd",
+  converted: "Order aangemaakt",
+  overig: "Overig",
+  cancelled: "Geannuleerd",
+};
 
 export const ORDER_STATUSES = [
   "awaiting_customer_info",
@@ -35,13 +47,14 @@ export const INVOICE_STATUSES = [
 export type InvoiceStatus = (typeof INVOICE_STATUSES)[number];
 
 export const LEAD_TRANSITIONS: Record<LeadStatus, LeadStatus[]> = {
-  new: ["missing_info", "quote_sent", "cancelled"],
-  missing_info: ["quote_sent", "offer_sent", "cancelled"],
-  quote_sent: ["offer_sent", "missing_info", "cancelled"],
-  offer_sent: ["approved", "missing_info", "cancelled"],
-  approved: ["converted", "cancelled"],
-  converted: [],
-  cancelled: [],
+  new: ["missing_info", "quote_sent", "overig", "cancelled"],
+  missing_info: ["quote_sent", "offer_sent", "overig", "cancelled"],
+  quote_sent: ["offer_sent", "missing_info", "overig", "cancelled"],
+  offer_sent: ["approved", "missing_info", "overig", "cancelled"],
+  approved: ["converted", "overig", "cancelled"],
+  converted: ["overig"],
+  overig: ["new", "cancelled"],
+  cancelled: ["new", "overig"],
 };
 
 export const ORDER_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {

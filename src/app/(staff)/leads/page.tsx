@@ -3,7 +3,7 @@ import { desc, eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { customers, leads } from "@/db/schema";
 import { createLead, createLeadFromIntakeText } from "@/lib/actions/leads";
-import { LEAD_STATUSES } from "@/lib/constants/statuses";
+import { LEAD_STATUSES, LEAD_STATUS_LABELS } from "@/lib/constants/statuses";
 import { PageHeader } from "@/components/layout/app-panel";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -22,36 +22,41 @@ export default async function LeadsPage() {
 
   const allCustomers = await db.select().from(customers);
 
+  const activeRows = rows.filter(
+    (r) => r.lead.status !== "overig" && r.lead.status !== "cancelled"
+  );
+  const archivedRows = rows.filter(
+    (r) => r.lead.status === "overig" || r.lead.status === "cancelled"
+  );
+
   return (
     <div className="page-content space-y-8">
       <PageHeader
         eyebrow="Bedrijfsmanagement web"
         title="Klantaanvragen"
-        description="Overzicht van alle inkomende aanvragen. Plak mails voor AI-intake of maak handmatig een nieuwe aanvraag aan."
+        description="Contact en website-aanvragen komen hier binnen. Verplaats irrelevante leads naar Overig."
         actions={
           <span className="filter-pill text-gold-bright">
-            {rows.length} aanvragen
+            {activeRows.length} actief
           </span>
         }
       />
 
-      <div className="flex flex-wrap gap-2">
-        {["Alle", "Nieuw", "In behandeling", "Offerte", "Afgerond"].map((label) => (
-          <span key={label} className="filter-pill">
-            {label}
-          </span>
-        ))}
+      <div className="flex flex-wrap gap-2 text-xs text-muted">
+        <span className="filter-pill">Contact → leads</span>
+        <span className="filter-pill">Custom Champagne → leads</span>
+        <span className="filter-pill">Goedgekeurd → order + nummer</span>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {rows.map(({ lead, customer }) => (
+        {activeRows.map(({ lead, customer }) => (
           <Link key={lead.id} href={`/leads/${lead.id}`} className="group">
             <article className="app-card flex h-full flex-col p-4 transition group-hover:border-gold/50">
               <div className="mb-3 flex items-start justify-between gap-2">
                 <Badge className="border-gold/20 bg-black/30 text-xs text-muted">
                   {lead.source}
                 </Badge>
-                <Badge>{lead.status}</Badge>
+                <Badge>{LEAD_STATUS_LABELS[lead.status as keyof typeof LEAD_STATUS_LABELS] ?? lead.status}</Badge>
               </div>
               <h2 className="text-xl font-bold text-foreground">
                 {customer?.name ?? "Onbekende klant"}
@@ -70,6 +75,26 @@ export default async function LeadsPage() {
           </Link>
         ))}
       </div>
+
+      {activeRows.length === 0 && (
+        <p className="text-center text-sm text-muted">Geen actieve aanvragen.</p>
+      )}
+
+      {archivedRows.length > 0 && (
+        <div className="space-y-3">
+          <h2 className="text-lg font-semibold text-muted">Overig / geannuleerd ({archivedRows.length})</h2>
+          <ul className="space-y-2 text-sm">
+            {archivedRows.map(({ lead, customer }) => (
+              <li key={lead.id}>
+                <Link href={`/leads/${lead.id}`} className="hover:text-gold-bright">
+                  #{lead.id} {lead.title ?? "—"} — {customer?.name ?? "?"} (
+                  {LEAD_STATUS_LABELS[lead.status as keyof typeof LEAD_STATUS_LABELS] ?? lead.status})
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       {rows.length === 0 && (
         <p className="text-center text-sm text-muted">Nog geen aanvragen — maak er hieronder een aan.</p>

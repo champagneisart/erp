@@ -1,6 +1,6 @@
 # WordPress Avada → ERP webhooks
 
-Alle Avada-formulieren sturen naar **één endpoint**. Het type formulier bepaalt wat het ERP doet.
+Alle gekoppelde Avada-formulieren sturen naar **één endpoint**. Formulier-ID en naam bepalen automatisch wat het ERP doet.
 
 ```
 POST https://app.champagneisart.nl/api/webhooks/forms
@@ -8,69 +8,62 @@ Authorization: Bearer <WEBHOOK_SECRET>
 Content-Type: application/json
 ```
 
-Alternatief header: `X-Webhook-Secret: <WEBHOOK_SECRET>`
+## Jullie formulieren (mapping)
 
-## Formuliertypes
+| Formulier | Form ID | ERP actie |
+|-----------|---------|-----------|
+| Contact us | 51 | Lead (contact) |
+| Contact | 4257 | Lead (contact) |
+| Custom Champagne * (zie lijst) | diverse | Lead (aanvraag) |
+| Ontwerpdetails van bestelling | 465 | Werkbon op order |
+| Haring Party 2024 | 52 | **Niet koppelen** |
+| Champagne Sparta | 534 | **Niet koppelen** |
+| Sollicitatie | 121 | **Niet koppelen** |
+| Slijterij Champagne met kunst | 30 | **Niet koppelen** |
+| Custom Champagne Horeca | 72 | **Niet koppelen** |
 
-| Type | Wat gebeurt er in het ERP |
-|------|---------------------------|
-| `contact` | Klant + aanvraag + bericht in Inbox |
-| `aanvraag` | Klant + aanvraag + taak voor staff + Inbox |
-| `ontwerpdetails` | Werkbon/richtlijn op order (of taak als order nog niet bestaat) |
+Custom Champagne formulieren (automatisch als **aanvraag** via naam):
+- Zakengeschenk, Relatiegeschenk (86), Eindejaarsgeschenk, Dikke/Dikkere/Nog Dikkere Fles (228, 382), etc.
 
-Type doorgeven via:
-- Query: `?type=aanvraag`
-- Hidden field in formulier: `form_type` = `contact` / `aanvraag` / `ontwerpdetails`
-- JSON body: `"form_type": "aanvraag"`
+## Wat gebeurt er in het ERP
+
+| Type | Resultaat |
+|------|-----------|
+| **contact** | Klant + lead (status *Nieuw*) + Inbox |
+| **aanvraag** | Klant + lead (status *Nieuw*) + taak + Inbox |
+| **ontwerpdetails** | Werkbon/richtlijn op order (of taak als order nog niet bestaat) |
+
+Contact én aanvraag komen **beide in Aanvragen**. Irrelevante leads verplaats je naar status **Overig**.
+
+Lead-flow:
+1. **Nieuw** → indicatie/offerte → **Goedgekeurd**
+2. **Omzetten naar order** → ordernummer `CIA-2026-…` + status *Order aangemaakt*
 
 ## Vercel setup
 
-1. Genereer secret: `openssl rand -base64 32`
-2. Zet in Vercel → Environment Variables: `WEBHOOK_SECRET=...`
-3. Deploy (webhook werkt pas op publieke URL, niet op localhost)
+1. `WEBHOOK_SECRET` in Vercel (zelfde als lokaal)
+2. Deploy — webhook werkt alleen op publieke URL
 
-Lokaal testen kan met curl:
+## PHP voor child theme (aanbevolen)
 
-```bash
-curl -X POST "http://localhost:3000/api/webhooks/forms?type=contact" \
-  -H "Authorization: Bearer jouw-secret" \
-  -H "Content-Type: application/json" \
-  -d '{"naam":"Test","email":"test@voorbeeld.nl","bericht":"Hoi!"}'
-```
-
-## Avada per formulier
-
-### Optie A — Hidden field (aanbevolen)
-
-Voeg in elk Avada-formulier een **Hidden Field** toe:
-
-| Formulier | Hidden field name | Value |
-|-----------|-------------------|-------|
-| Contact | `form_type` | `contact` |
-| Aanvraag / offerte | `form_type` | `aanvraag` |
-| Ontwerpdetails | `form_type` | `ontwerpdetails` |
-
-Webhook-URL in Avada (Form Actions → Webhook, indien beschikbaar):
-
-```
-https://app.champagneisart.nl/api/webhooks/forms
-```
-
-Header: `Authorization: Bearer <WEBHOOK_SECRET>`
-
-### Optie B — PHP in child theme (werkt altijd)
-
-Plak in `functions.php` van je child theme:
+Eén hook voor **alle** formulieren — form ID + naam gaan mee, ERP beslist:
 
 ```php
 <?php
 define('CIA_WEBHOOK_URL', 'https://app.champagneisart.nl/api/webhooks/forms');
 define('CIA_WEBHOOK_SECRET', 'jouw-webhook-secret');
 
-function cia_send_form_to_erp(array $payload, string $form_type) {
-  $payload['form_type'] = $form_type;
+add_action('fusion_form_submission', function ($args) {
+  $form_id   = (string) ($args['form_id'] ?? '');
+  $form_data = $args['data'] ?? [];
+  $form_name = $args['form_name'] ?? $args['form_title'] ?? '';
 
-  wp_remote_post(CIA_WEBHOOK_URL . '?type=' . rawurlencode($form_type), [
+  $payload = array_merge($form_data, [
+    'form_id'   => $form_id,
+    'form_name' => $form_name,
+  ]);
+
+  wp_remote_post(CIA_WEBHOOK_URL, [
     'timeout' => 20,
     'headers' => [
       'Content-Type'  => 'application/json',
@@ -78,59 +71,28 @@ function cia_send_form_to_erp(array $payload, string $form_type) {
     ],
     'body' => wp_json_encode($payload),
   ]);
-}
-
-// Pas form_id aan per Avada-formulier (te vinden in form editor URL)
-add_action('fusion_form_submission', function ($args) {
-  $form_id = $args['form_id'] ?? '';
-  $data    = $args['data'] ?? [];
-
-  $map = [
-    '123' => 'contact',         // Contactformulier
-    '456' => 'aanvraag',        // Offerte / aanvraag
-    '789' => 'ontwerpdetails',  // Ontwerpdetails werkbon
-  ];
-
-  $type = $map[$form_id] ?? 'aanvraag';
-  cia_send_form_to_erp($data, $type);
 }, 10, 1);
 ```
 
-> Form ID staat in de Avada form editor in de URL (`form_id=...`) of in de shortcode.
+Formulieren die **niet** gekoppeld moeten worden (Sparta, Sollicitatie, …) hoef je niet apart uit te zetten — het ERP negeert ze automatisch (`ignored: true`).
 
-## Velden herkenning
+## Handmatig per formulier (Avada Webhook action)
 
-De webhook mapt Nederlandse en Engelse veldnamen automatisch:
+URL: `https://app.champagneisart.nl/api/webhooks/forms`  
+Header: `Authorization: Bearer <WEBHOOK_SECRET>`
 
-| ERP veld | Formuliervelden (voorbeelden) |
-|----------|-------------------------------|
-| Naam | `naam`, `name`, `volledige_naam` |
-| E-mail | `email`, `e-mail`, `mail` |
-| Telefoon | `telefoon`, `phone`, `tel` |
-| Bericht | `bericht`, `message`, `toelichting` |
-| Ordernummer | `order_number`, `ordernummer`, `bestelnummer` |
-| Thema | `thema`, `theme` |
-| Kleuren | `kleuren`, `kleurschema`, `color_scheme` |
-| Tekst fles | `tekst`, `fles_tekst`, `bottle_text` |
-| Voorkant | `voorkant`, `front_design` |
-| Achterkant | `achterkant`, `back_design` |
-| Stijl | `stijl`, `style` |
-| Logo | `logo`, `logos`, `logo_notities` |
-
-Onbekende velden worden opgeslagen in de aanvraagomschrijving / werkbon-notities.
+Optioneel hidden field `form_type` alleen nodig als form ID/naam niet herkend wordt.
 
 ## Ontwerpdetails — order koppelen
 
-Het formulier zoekt een order in deze volgorde:
+Zoekt order op:
+1. Veld `ordernummer` / `order_number`
+2. Anders: meest recente order op e-mail
 
-1. **Ordernummer** (`ordernummer` / `order_number`) — bijv. `CIA-2026-123456`
-2. **E-mail** — meest recente order van die klant
-3. Geen match → opslag bij aanvraag + **taak** “Ontwerpdetails — koppel aan order”
+Tip: stuur klanten een link met ordernummer in het formulier.
 
-Tip: zet een hidden field of readonly veld met ordernummer in het ontwerpdetails-formulier (via link uit klantmail).
+## Velden
 
-## Beveiliging
+Automatisch herkend: `naam`, `email`, `telefoon`, `bericht`, `thema`, `kleuren`, `voorkant`, `achterkant`, `ordernummer`, …
 
-- Deel `WEBHOOK_SECRET` nooit in frontend JavaScript
-- Alleen server-side (WordPress PHP of Avada webhook headers)
-- Rotate secret als het gelekt is
+Onbekende velden worden opgeslagen in de omschrijving.

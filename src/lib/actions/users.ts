@@ -12,6 +12,7 @@ import {
   isMailjetConfigured,
   sendPasswordResetEmail,
 } from "@/lib/email/mailjet";
+import { getAppBaseUrl } from "@/lib/auth/env";
 
 const SALT_ROUNDS = 10;
 
@@ -139,7 +140,7 @@ export async function requestPasswordReset(email: string) {
     expiresAt,
   });
 
-  const baseUrl = process.env.AUTH_URL ?? "http://localhost:3000";
+  const baseUrl = getAppBaseUrl();
   const resetUrl = `${baseUrl}/reset-password/${token}`;
 
   if (!isMailjetConfigured()) {

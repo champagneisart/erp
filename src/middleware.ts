@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { getToken } from "next-auth/jwt";
+import { isVercelAppHost } from "@/lib/auth/env";
 
 const APP_HOST = process.env.NEXT_PUBLIC_APP_HOST ?? "";
 const ARTIST_HOST = process.env.NEXT_PUBLIC_ARTIST_HOST ?? "";
@@ -14,6 +15,8 @@ function getHostType(host: string): "app" | "artist" | "status" | "local" {
   if (h.startsWith("artist.")) return "artist";
   if (h.startsWith("status.")) return "status";
   if (h.startsWith("app.")) return "app";
+  // Single Vercel URL serves staff routes until custom subdomains are connected.
+  if (isVercelAppHost(h)) return "app";
   return "local";
 }
 
@@ -55,6 +58,7 @@ export async function middleware(request: NextRequest) {
   const token = await getToken({
     req: request,
     secret: process.env.AUTH_SECRET,
+    secureCookie: process.env.NODE_ENV === "production",
   });
   const session = token
     ? {

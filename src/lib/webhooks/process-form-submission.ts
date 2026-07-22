@@ -195,13 +195,17 @@ async function upsertWorkInstructionForOrder(
 
 export async function processContactForm(data: NormalizedFormData) {
   const customer = await findOrCreateCustomer(data);
+  const leadTitle =
+    data.title ??
+    data.subject ??
+    (data.formName ? `Contact: ${data.formName}` : "Contact via website");
 
   const [lead] = await db
     .insert(leads)
     .values({
       customerId: customer.id,
       source: "website",
-      title: data.subject ?? "Contact via website",
+      title: leadTitle,
       description: buildDescription(data),
       rawPayload: buildRawPayload(data),
       status: "new",
@@ -233,13 +237,18 @@ export async function processContactForm(data: NormalizedFormData) {
 
 export async function processAanvraagForm(data: NormalizedFormData) {
   const customer = await findOrCreateCustomer(data);
+  const leadTitle =
+    data.title ??
+    data.subject ??
+    data.formName ??
+    "Nieuwe aanvraag via website";
 
   const [lead] = await db
     .insert(leads)
     .values({
       customerId: customer.id,
       source: "website",
-      title: data.title ?? data.subject ?? "Nieuwe aanvraag via website",
+      title: leadTitle,
       description: buildDescription(data),
       rawPayload: buildRawPayload(data),
       status: "new",

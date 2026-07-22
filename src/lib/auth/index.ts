@@ -6,9 +6,21 @@ import { db } from "@/lib/db";
 import { users } from "@/db/schema";
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
+  // Required on Vercel / preview URLs until custom domain is connected.
+  // Also set AUTH_TRUST_HOST=true in Vercel env (optional; this config is enough).
   trustHost: true,
   session: { strategy: "jwt" },
   pages: { signIn: "/login" },
+  cookies: {
+    sessionToken: {
+      options: {
+        httpOnly: true,
+        sameSite: "lax",
+        path: "/",
+        secure: process.env.NODE_ENV === "production",
+      },
+    },
+  },
   providers: [
     Credentials({
       name: "credentials",
