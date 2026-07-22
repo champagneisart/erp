@@ -146,7 +146,13 @@ export default async function AiStudioPage() {
               ))}
             </Select>
             <Input name="title" placeholder="Titel bestand" required />
-            <input name="file" type="file" required className="field-file" />
+            <input
+              name="file"
+              type="file"
+              accept=".md,.markdown,.txt,text/markdown,text/plain"
+              required
+              className="field-file"
+            />
             <Button type="submit" variant="outline">
               Upload
             </Button>

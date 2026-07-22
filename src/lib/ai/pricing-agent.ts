@@ -2,6 +2,7 @@ import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { aiAgentProfiles, aiTrainingItems } from "@/db/schema";
 import { callOpenAiText } from "@/lib/ai";
+import { truncateForPrompt } from "@/lib/knowledge/text-upload";
 
 const FALLBACK_PROMPT = `Je bent de Prijs Agent voor Champagne is Art Studio.
 Bereken inkoop (fles + beschildering), verkoop excl./incl. BTW (21%), marge en totaal op basis van aantal.
@@ -22,12 +23,15 @@ export async function getPricingAgentSystemPrompt(): Promise<string> {
     .select()
     .from(aiTrainingItems)
     .where(eq(aiTrainingItems.agentId, agent.id))
-    .limit(20);
+    .limit(8);
 
   if (items.length === 0) return base;
 
   const trainingBlock = items
-    .map((item) => `### ${item.title} (${item.category})\n${item.content}`)
+    .map(
+      (item) =>
+        `### ${item.title} (${item.category})\n${truncateForPrompt(item.content, 4000)}`
+    )
     .join("\n\n");
 
   return `${base}\n\n---\n\n## Aanvullende trainingsdata\n${trainingBlock}`;

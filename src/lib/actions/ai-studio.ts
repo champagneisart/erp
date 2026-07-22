@@ -13,6 +13,11 @@ import { auth } from "@/lib/auth";
 import { assertAdmin, assertStaff } from "@/lib/auth/permissions";
 import { storeUploadedFile } from "@/lib/actions/file-storage";
 import { performOpenAiHealthCheck } from "@/lib/ai/health-check";
+import {
+  isTextKnowledgeFile,
+  readUploadText,
+  titleFromFileName,
+} from "@/lib/knowledge/text-upload";
 
 export async function upsertSetting(key: string, value: string) {
   const session = await auth();
@@ -113,14 +118,33 @@ export async function uploadAiTrainingFile(formData: FormData) {
   const session = await auth();
   assertStaff(session);
 
-  const title = ((formData.get("title") as string) || "").trim();
+  const titleInput = ((formData.get("title") as string) || "").trim();
   const agentIdRaw = formData.get("agentId") as string;
   const file = formData.get("file") as File | null;
-  if (!title) throw new Error("Titel is verplicht");
   if (!file) throw new Error("Bestand is verplicht");
 
+  const title = titleInput || titleFromFileName(file.name);
   const stored = await storeUploadedFile(file, "ai-studio");
+
+  let trainingItemId: number | null = null;
+
+  if (isTextKnowledgeFile(stored.fileName, stored.mimeType)) {
+    const content = await readUploadText(file);
+    const [item] = await db
+      .insert(aiTrainingItems)
+      .values({
+        agentId: agentIdRaw ? Number(agentIdRaw) : null,
+        title,
+        category: "import",
+        content,
+        source: "file-upload",
+      })
+      .returning();
+    trainingItemId = item.id;
+  }
+
   await db.insert(aiTrainingFiles).values({
+    trainingItemId,
     title,
     agentId: agentIdRaw ? Number(agentIdRaw) : null,
     fileName: stored.fileName,

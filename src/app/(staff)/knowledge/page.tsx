@@ -9,21 +9,28 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import {
   createKnowledgeArticle,
+  linkKnowledgeArticleToAgent,
+  listAgentsForKnowledge,
   listKnowledgeFiles,
   uploadKnowledgeFile,
 } from "@/lib/actions/knowledge";
+import { Select } from "@/components/ui/select";
 
 export default async function KnowledgePage() {
   const session = await auth();
   const articles = await db.select().from(kbArticles).orderBy(desc(kbArticles.updatedAt));
   const files = await listKnowledgeFiles();
+  const agents = await listAgentsForKnowledge();
 
   return (
     <div className="page-content space-y-6">
       <h1 className="text-xl font-semibold sm:text-2xl">Kennisbank</h1>
       <p className="text-sm text-muted">
-        Gebruikt door AI-agents voor tone of voice, FAQ en regels.{" "}
-        {isAdmin(session) ? "Admin kan artikelen bewerken (MVP: via database seed)." : ""}
+        Gebruikt door AI-agents voor tone of voice, FAQ en regels. Upload{" "}
+        <strong className="font-normal text-foreground">.md</strong> of{" "}
+        <strong className="font-normal text-foreground">.txt</strong> — de tekst wordt automatisch
+        een artikel. Koppel daarna handmatig aan een agent in AI Studio of via de knop hieronder.
+        {isAdmin(session) ? " Admin kan artikelen bewerken (MVP: via database seed)." : ""}
       </p>
       <Card>
         <CardHeader>
@@ -62,13 +69,24 @@ export default async function KnowledgePage() {
           <CardTitle>Kennisbank-bestanden uploaden</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <form action={uploadKnowledgeFile} className="form-stack md:grid-cols-3">
-            <Input name="title" placeholder="Titel van bestand" required />
-            <input name="file" type="file" required className="field-file" />
+          <form action={uploadKnowledgeFile} className="form-stack md:grid-cols-4">
+            <Input name="title" placeholder="Titel (optioneel bij .md)" />
+            <Input name="category" placeholder="Categorie (bijv. pricing, faq)" defaultValue="import" />
+            <input
+              name="file"
+              type="file"
+              accept=".md,.markdown,.txt,text/markdown,text/plain"
+              required
+              className="field-file"
+            />
             <Button type="submit" variant="outline">
-              Upload
+              Upload .md / .txt
             </Button>
           </form>
+          <p className="text-xs text-muted">
+            PDF/Word: upload in AI Studio als bijlage; voor AI-gebruik werkt platte tekst of markdown
+            het goedkoopst (minder tokens).
+          </p>
           {files.length > 0 && (
             <div className="space-y-2">
               {files.map((f) => (
@@ -95,8 +113,32 @@ export default async function KnowledgePage() {
                 <span className="text-sm font-normal text-muted">({a.category})</span>
               </CardTitle>
             </CardHeader>
-            <CardContent>
-              <pre className="whitespace-pre-wrap text-sm text-foreground">{a.content}</pre>
+            <CardContent className="space-y-4">
+              <pre className="max-h-64 overflow-auto whitespace-pre-wrap text-sm text-foreground">
+                {a.content}
+              </pre>
+              {agents.length > 0 && (
+                <form
+                  action={linkKnowledgeArticleToAgent}
+                  className="flex flex-wrap items-end gap-2 border-t border-gold/10 pt-4"
+                >
+                  <input type="hidden" name="articleId" value={a.id} />
+                  <div className="min-w-[12rem] flex-1">
+                    <label className="mb-1 block text-xs text-muted">Koppel aan agent</label>
+                    <Select name="agentId" required>
+                      <option value="">— Agent —</option>
+                      {agents.map((agent) => (
+                        <option key={agent.id} value={agent.id}>
+                          {agent.name}
+                        </option>
+                      ))}
+                    </Select>
+                  </div>
+                  <Button type="submit" variant="outline" className="text-xs sm:text-sm">
+                    Toevoegen als trainingsdata
+                  </Button>
+                </form>
+              )}
             </CardContent>
           </Card>
         ))}
