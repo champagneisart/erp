@@ -48,7 +48,7 @@ export function AgentChatPanel({ agents }: { agents: AgentOption[] }) {
   const showYesNo = lastAssistant?.questionType === "yes_no" && !pending;
 
   return (
-    <div className="app-card flex h-[calc(100vh-14rem)] flex-col overflow-hidden">
+    <div className="app-card flex h-[min(72dvh,640px)] min-h-[420px] min-w-0 max-w-full flex-col overflow-hidden">
       {!sessionId ? (
         <div className="flex flex-1 flex-col gap-4 p-6">
           <p className="text-sm text-muted">
@@ -160,17 +160,18 @@ export function AgentChatPanel({ agents }: { agents: AgentOption[] }) {
                 e.preventDefault();
                 submitText(input);
               }}
-              className="flex gap-2"
+              className="form-inline min-w-0"
             >
               <Input
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 placeholder="Typ je antwoord..."
                 disabled={pending || showYesNo}
+                className="min-w-0 flex-1"
               />
               <Button
                 type="submit"
-                className="rounded-full"
+                className="rounded-full sm:shrink-0"
                 disabled={pending || showYesNo || !input.trim()}
               >
                 Verstuur

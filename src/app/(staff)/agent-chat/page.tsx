@@ -8,17 +8,17 @@ export default async function AgentChatPage() {
   const recent = await listRecentChatSessions();
 
   return (
-    <div className="space-y-6">
+    <div className="page-content space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold">Agent test-chat</h1>
+        <h1 className="text-xl font-semibold sm:text-2xl">Agent test-chat</h1>
         <p className="text-sm text-muted">
           Test agents in een gesprek. De agent stelt vragen, toont ja/nee-knoppen waar nodig, en kan
           klanten en aanvragen direct aanmaken.
         </p>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-3">
-        <div className="lg:col-span-2">
+      <div className="grid min-w-0 gap-6 lg:grid-cols-3">
+        <div className="min-w-0 lg:col-span-2">
           <AgentChatPanel
             agents={agents.map((a) => ({
               id: a.id,

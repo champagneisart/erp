@@ -7,7 +7,7 @@ export function AppPanel({
   children: React.ReactNode;
   className?: string;
 }) {
-  return <div className={cn("app-panel p-6 md:p-8", className)}>{children}</div>;
+  return <div className={cn("app-panel p-4 sm:p-6 md:p-8", className)}>{children}</div>;
 }
 
 export function PageHeader({
@@ -29,7 +29,7 @@ export function PageHeader({
             {eyebrow}
           </p>
         )}
-        <h1 className="text-3xl font-bold tracking-tight text-foreground">{title}</h1>
+        <h1 className="text-2xl font-bold tracking-tight text-foreground md:text-3xl">{title}</h1>
         {description && <p className="max-w-2xl text-sm text-muted">{description}</p>}
       </div>
       {actions && <div className="flex shrink-0 items-center gap-2">{actions}</div>}

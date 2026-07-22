@@ -25,16 +25,16 @@ export default async function PlanningPage() {
     .where(isNull(orders.artistUserId));
 
   return (
-    <div className="space-y-6">
-      <h1 className="text-2xl font-semibold">Planning</h1>
+    <div className="page-content space-y-6">
+      <h1 className="text-xl font-semibold sm:text-2xl">Planning</h1>
       <Card>
         <CardHeader>
           <CardTitle>Ingepland bij kunstenaar</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
           {rows.map(({ order, customer, artist }) => (
-            <div key={order.id} className="flex justify-between border-b border-gold/10 pb-2 text-sm">
-              <div>
+            <div key={order.id} className="flex flex-col gap-1 border-b border-gold/10 pb-3 text-sm sm:flex-row sm:justify-between">
+              <div className="min-w-0">
                 <Link href={`/orders/${order.id}`} className="font-medium hover:underline">
                   {order.orderNumber}
                 </Link>
@@ -42,7 +42,7 @@ export default async function PlanningPage() {
                   {customer.name} — {artist?.name}
                 </p>
               </div>
-              <div className="text-right">
+              <div className="text-left sm:text-right">
                 <p>{formatDate(order.deadline)}</p>
                 <p className="text-muted">{order.status}</p>
               </div>

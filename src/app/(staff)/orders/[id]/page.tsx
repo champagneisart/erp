@@ -26,6 +26,8 @@ import {
 } from "@/lib/constants/statuses";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 
@@ -74,9 +76,9 @@ export default async function OrderDetailPage({
   const current = order.status as OrderStatus;
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center gap-3">
-        <h1 className="text-2xl font-semibold">{order.orderNumber}</h1>
+    <div className="page-content space-y-6">
+      <div className="flex flex-wrap items-center gap-3">
+        <h1 className="text-xl font-semibold sm:text-2xl">{order.orderNumber}</h1>
         <Badge>{order.status}</Badge>
       </div>
       <p className="text-muted">
@@ -118,14 +120,10 @@ export default async function OrderDetailPage({
                     : undefined,
               });
             }}
-            className="grid max-w-lg gap-3"
+            className="form-stack sm:max-w-lg"
           >
             <label className="text-sm text-muted">Fles type</label>
-            <select
-              name="productId"
-              defaultValue={order.productId ?? ""}
-              className="h-10 rounded-md border border-gold/25 bg-background px-3 text-sm"
-            >
+            <Select name="productId" defaultValue={order.productId ?? ""}>
               <option value="">— Kies fles —</option>
               {allProducts.map((p) => (
                 <option key={p.id} value={p.id}>
@@ -134,7 +132,7 @@ export default async function OrderDetailPage({
                   {p.sellPriceIncVat ? ` · €${p.sellPriceIncVat}` : ""}
                 </option>
               ))}
-            </select>
+            </Select>
             {selectedProduct && (
               <p className="text-xs text-muted">
                 Inkoop: €{selectedProduct.purchasePriceExVat ?? "?"} excl. · Verkoop: €
@@ -145,15 +143,11 @@ export default async function OrderDetailPage({
             <Input name="bottleFormat" placeholder="Formaat (optioneel)" defaultValue={order.bottleFormat ?? selectedProduct?.format ?? ""} />
             <Input name="quantity" type="number" defaultValue={order.quantity} />
             <Input name="deadline" type="date" defaultValue={order.deadline?.slice(0, 10) ?? ""} />
-            <select
-              name="fulfillment"
-              defaultValue={order.fulfillment ?? ""}
-              className="h-10 rounded-md border border-gold/25 px-3 text-sm"
-            >
+            <Select name="fulfillment" defaultValue={order.fulfillment ?? ""}>
               <option value="">—</option>
               <option value="pickup">Afhalen</option>
               <option value="ship">Verzenden</option>
-            </select>
+            </Select>
             <Button type="submit">Opslaan</Button>
           </form>
         </CardContent>
@@ -197,14 +191,14 @@ export default async function OrderDetailPage({
                 style: fd.get("style") as string,
               });
             }}
-            className="grid gap-3"
+            className="form-stack"
           >
             <Input name="wi_theme" placeholder="Thema" defaultValue={wi?.theme ?? ""} />
             <Input name="colorScheme" placeholder="Kleuren" defaultValue={wi?.colorScheme ?? ""} />
-            <textarea
+            <Textarea
               name="textContent"
               defaultValue={wi?.textContent ?? ""}
-              className="min-h-20 rounded-md border p-2 text-sm"
+              className="min-h-20"
               placeholder="Tekst"
             />
             <Input name="frontDesign" placeholder="Voorkant" defaultValue={wi?.frontDesign ?? ""} />
@@ -226,17 +220,17 @@ export default async function OrderDetailPage({
               const uid = fd.get("artistUserId") as string;
               if (uid) await assignArtist(orderId, Number(uid));
             }}
-            className="flex gap-2"
+            className="form-inline"
           >
-            <select name="artistUserId" className="h-10 flex-1 rounded-md border px-3 text-sm">
+            <Select name="artistUserId" defaultValue={order.artistUserId ?? ""} className="sm:flex-1">
               <option value="">Kies kunstenaar</option>
               {artists.map((a) => (
-                <option key={a.id} value={a.id} selected={order.artistUserId === a.id}>
+                <option key={a.id} value={a.id}>
                   {a.name}
                 </option>
               ))}
-            </select>
-            <Button type="submit">Toewijzen</Button>
+            </Select>
+            <Button type="submit" className="sm:shrink-0">Toewijzen</Button>
           </form>
           <form
             action={async () => {

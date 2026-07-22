@@ -10,6 +10,8 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import Link from "next/link";
 
 export default async function AiStudioPage() {
@@ -36,8 +38,8 @@ export default async function AiStudioPage() {
     .limit(30);
 
   return (
-    <div className="space-y-6">
-      <h1 className="text-2xl font-semibold">AI Studio</h1>
+    <div className="page-content space-y-6">
+      <h1 className="text-xl font-semibold sm:text-2xl">AI Studio</h1>
       <p className="text-sm text-muted">
         Beheer aparte agents, voer trainingsdata in en stuur prompts per domein.{" "}
         <Link href="/agent-chat" className="text-gold underline">
@@ -61,12 +63,12 @@ export default async function AiStudioPage() {
                     (fd.get("systemPrompt") as string) ?? ""
                   );
                 }}
-                className="space-y-2"
+                className="form-stack"
               >
-                <textarea
+                <Textarea
                   name="systemPrompt"
                   defaultValue={agent.systemPrompt ?? ""}
-                  className="field-textarea min-h-80 font-mono"
+                  className="min-h-80 font-mono"
                   placeholder="System prompt / werkinstructie voor deze agent"
                 />
                 {agent.slug === "pricing" && (
@@ -101,20 +103,17 @@ export default async function AiStudioPage() {
                 source: "manual",
               });
             }}
-            className="grid gap-3"
+            className="form-stack"
           >
-            <div className="grid gap-3 md:grid-cols-3">
-              <select
-                name="agentId"
-                className="field-select w-full"
-              >
+            <div className="grid min-w-0 gap-3 md:grid-cols-3">
+              <Select name="agentId">
                 <option value="">Algemeen (voor alle agents)</option>
                 {agents.map((agent) => (
                   <option key={agent.id} value={agent.id}>
                     {agent.name}
                   </option>
                 ))}
-              </select>
+              </Select>
               <Input name="title" placeholder="Titel" required />
               <Input
                 name="category"
@@ -122,9 +121,9 @@ export default async function AiStudioPage() {
                 required
               />
             </div>
-            <textarea
+            <Textarea
               name="content"
-              className="field-textarea min-h-28"
+              className="min-h-28"
               placeholder="Regels, voorbeelden, uitzonderingen, producten, prijzen..."
               required
             />
@@ -137,25 +136,17 @@ export default async function AiStudioPage() {
           <CardTitle>Bestanden voor AI Studio</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <form action={uploadAiTrainingFile} className="grid gap-3 md:grid-cols-4">
-            <select
-              name="agentId"
-              className="h-10 rounded-md border border-gold/25 px-3 text-sm"
-            >
+          <form action={uploadAiTrainingFile} className="form-stack md:grid-cols-4">
+            <Select name="agentId">
               <option value="">Algemeen</option>
               {agents.map((agent) => (
                 <option key={agent.id} value={agent.id}>
                   {agent.name}
                 </option>
               ))}
-            </select>
+            </Select>
             <Input name="title" placeholder="Titel bestand" required />
-            <input
-              name="file"
-              type="file"
-              required
-              className="h-10 rounded-md border border-gold/25 px-3 py-1 text-sm"
-            />
+            <input name="file" type="file" required className="field-file" />
             <Button type="submit" variant="outline">
               Upload
             </Button>

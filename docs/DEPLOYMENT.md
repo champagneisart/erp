@@ -27,9 +27,12 @@ NEXT_PUBLIC_STATUS_HOST=status.jouwdomein.nl
 BLOB_READ_WRITE_TOKEN=
 OPENAI_API_KEY=
 CRON_SECRET=
+WEBHOOK_SECRET=
 ```
 
 3. Deploy
+
+**WordPress Avada formulieren:** zie [WORDPRESS-AVADA.md](./WORDPRESS-AVADA.md) — webhook `WEBHOOK_SECRET` verplicht.
 
 **Cron (Hobby-plan):** OpenAI healthcheck draait 1× per dag (`0 7 * * *` UTC). Vaker vereist Vercel Pro, of test handmatig via Instellingen.
 

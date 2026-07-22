@@ -5,6 +5,7 @@ import { customers, customerFiles, leads, orders } from "@/db/schema";
 import { updateCustomer } from "@/lib/actions/customers";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 export default async function CustomerDetailPage({
@@ -35,8 +36,8 @@ export default async function CustomerDetailPage({
     .where(eq(orders.customerId, customerId));
 
   return (
-    <div className="space-y-6">
-      <h1 className="text-2xl font-semibold">{customer.name}</h1>
+    <div className="page-content space-y-6">
+      <h1 className="text-xl font-semibold sm:text-2xl">{customer.name}</h1>
       <Card>
         <CardHeader>
           <CardTitle>Gegevens</CardTitle>
@@ -53,17 +54,13 @@ export default async function CustomerDetailPage({
                 notes: (fd.get("notes") as string) || undefined,
               });
             }}
-            className="grid max-w-lg gap-3"
+            className="form-stack sm:max-w-lg"
           >
             <Input name="name" defaultValue={customer.name} required />
             <Input name="company" defaultValue={customer.company ?? ""} />
             <Input name="email" defaultValue={customer.email ?? ""} />
             <Input name="phone" defaultValue={customer.phone ?? ""} />
-            <textarea
-              name="notes"
-              defaultValue={customer.notes ?? ""}
-              className="min-h-24 rounded-md border border-gold/25 p-2 text-sm"
-            />
+            <Textarea name="notes" defaultValue={customer.notes ?? ""} className="min-h-24" />
             <Button type="submit">Bijwerken</Button>
           </form>
         </CardContent>

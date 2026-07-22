@@ -7,6 +7,8 @@ import { LEAD_STATUSES } from "@/lib/constants/statuses";
 import { PageHeader } from "@/components/layout/app-panel";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { formatDate } from "@/lib/utils";
@@ -21,7 +23,7 @@ export default async function LeadsPage() {
   const allCustomers = await db.select().from(customers);
 
   return (
-    <div className="space-y-8">
+    <div className="page-content space-y-8">
       <PageHeader
         eyebrow="Bedrijfsmanagement web"
         title="Klantaanvragen"
@@ -90,22 +92,18 @@ export default async function LeadsPage() {
                   description: (fd.get("description") as string) || undefined,
                 });
               }}
-              className="grid gap-3"
+              className="form-stack"
             >
-              <select name="customerId" className="field-select w-full">
+              <Select name="customerId">
                 <option value="">— Klant —</option>
                 {allCustomers.map((c) => (
                   <option key={c.id} value={c.id}>
                     {c.name}
                   </option>
                 ))}
-              </select>
+              </Select>
               <Input name="title" placeholder="Titel / thema" />
-              <textarea
-                name="description"
-                placeholder="Omschrijving"
-                className="field-textarea"
-              />
+              <Textarea name="description" placeholder="Omschrijving" />
               <Button type="submit" className="rounded-full">
                 Aanmaken
               </Button>
@@ -125,12 +123,12 @@ export default async function LeadsPage() {
                 if (!rawText.trim()) return;
                 await createLeadFromIntakeText(rawText);
               }}
-              className="grid gap-3"
+              className="form-stack"
             >
-              <textarea
+              <Textarea
                 name="rawText"
                 placeholder="Plak complete aanvraagtekst (mail, WhatsApp, formulier)."
-                className="field-textarea min-h-32"
+                className="min-h-32"
                 required
               />
               <Button type="submit" variant="secondary" className="rounded-full">

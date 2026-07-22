@@ -16,6 +16,7 @@ import { isMailjetConfigured } from "@/lib/email/mailjet";
 import { eq } from "drizzle-orm";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 export default async function SettingsPage() {
@@ -62,8 +63,8 @@ export default async function SettingsPage() {
   const mailjetReady = isMailjetConfigured();
 
   return (
-    <div className="space-y-6">
-      <h1 className="text-2xl font-semibold">Instellingen</h1>
+    <div className="page-content space-y-6">
+      <h1 className="text-xl font-semibold sm:text-2xl">Instellingen</h1>
 
       {currentUser && (
         <Card>
@@ -97,7 +98,7 @@ export default async function SettingsPage() {
                   role: fd.get("role") as "admin" | "staff" | "artist",
                 });
               }}
-              className="grid max-w-lg gap-3 rounded-lg border border-border p-4"
+              className="form-stack rounded-lg border border-border p-4 sm:max-w-lg"
             >
               <p className="text-sm font-medium">Nieuwe gebruiker</p>
               <Input name="name" placeholder="Naam" required />
@@ -109,15 +110,11 @@ export default async function SettingsPage() {
                 placeholder="Tijdelijk wachtwoord"
                 required
               />
-              <select
-                name="role"
-                required
-                className="h-10 rounded-md border border-border bg-background px-3 text-sm"
-              >
+              <Select name="role" required>
                 <option value="staff">Staff</option>
                 <option value="artist">Kunstenaar</option>
                 <option value="admin">Admin</option>
-              </select>
+              </Select>
               <Button type="submit">Gebruiker aanmaken</Button>
             </form>
 
@@ -134,26 +131,22 @@ export default async function SettingsPage() {
                       password: (fd.get("password") as string) || undefined,
                     });
                   }}
-                  className="grid gap-2 rounded-lg border border-border p-4 md:grid-cols-2"
+                  className="form-stack rounded-lg border border-border p-4 md:grid-cols-2"
                 >
                   <Input name="name" defaultValue={u.name} />
                   <Input name="email" type="email" defaultValue={u.email} />
-                  <select
-                    name="role"
-                    defaultValue={u.role}
-                    className="h-10 rounded-md border border-border bg-background px-3 text-sm"
-                  >
+                  <Select name="role" defaultValue={u.role}>
                     <option value="admin">Admin</option>
                     <option value="staff">Staff</option>
                     <option value="artist">Kunstenaar</option>
-                  </select>
+                  </Select>
                   <Input
                     name="password"
                     type="password"
                     placeholder="Nieuw wachtwoord (optioneel)"
                     minLength={8}
                   />
-                  <Button type="submit" variant="outline" className="md:col-span-2 md:max-w-xs">
+                  <Button type="submit" variant="outline" className="md:col-span-2 sm:max-w-xs">
                     Opslaan
                   </Button>
                 </form>
@@ -212,7 +205,7 @@ export default async function SettingsPage() {
                   (fd.get("openai_api_key") as string) ?? ""
                 );
               }}
-              className="flex gap-2"
+              className="form-inline"
             >
               <Input
                 name="openai_api_key"
@@ -278,7 +271,7 @@ export default async function SettingsPage() {
                   (fd.get("workbon_integration_url") as string) ?? ""
                 );
               }}
-              className="flex gap-2"
+              className="form-inline"
             >
               <Input
                 name="workbon_integration_url"

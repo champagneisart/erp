@@ -3,7 +3,14 @@
 import { asc, eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
-import { artistOrderEvents, orders, products, workInstructions } from "@/db/schema";
+import {
+  artistOrderEvents,
+  inventory,
+  inventoryLocations,
+  orders,
+  products,
+  workInstructions,
+} from "@/db/schema";
 import { auth } from "@/lib/auth";
 
 export async function addArtistEvent(
@@ -48,4 +55,29 @@ export async function getArtistOrders(userId: number) {
     .leftJoin(workInstructions, eq(workInstructions.orderId, orders.id))
     .where(eq(orders.artistUserId, userId))
     .orderBy(asc(orders.deadline));
+}
+
+/** Read-only voorraad op de locatie van deze kunstenaar (geen prijzen). */
+export async function getArtistStockView(userId: number) {
+  const [location] = await db
+    .select()
+    .from(inventoryLocations)
+    .where(eq(inventoryLocations.artistUserId, userId))
+    .limit(1);
+
+  if (!location) {
+    return { location: null, items: [] as { product: typeof products.$inferSelect; inv: typeof inventory.$inferSelect }[] };
+  }
+
+  const rows = await db
+    .select({ product: products, inv: inventory })
+    .from(inventory)
+    .innerJoin(products, eq(products.id, inventory.productId))
+    .where(eq(inventory.locationId, location.id))
+    .orderBy(products.name);
+
+  return {
+    location,
+    items: rows.filter(({ inv }) => inv.quantity > 0),
+  };
 }

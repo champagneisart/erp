@@ -31,7 +31,7 @@ export default async function DashboardPage() {
   const lowStock = await getLowStockProducts();
 
   return (
-    <div className="space-y-8">
+    <div className="page-content space-y-8">
       <PageHeader
         eyebrow="Overzicht"
         title="Dashboard"
@@ -48,8 +48,8 @@ export default async function DashboardPage() {
               <p className="text-sm text-muted">Geen open taken</p>
             )}
             {openTasks.map((t) => (
-              <div key={t.id} className="flex justify-between text-sm">
-                <Link href="/tasks" className="text-foreground hover:text-gold-bright">
+              <div key={t.id} className="flex items-start justify-between gap-2 text-sm">
+                <Link href="/tasks" className="min-w-0 flex-1 text-foreground hover:text-gold-bright">
                   {t.title}
                 </Link>
                 <Badge>{t.priority}</Badge>
@@ -98,10 +98,10 @@ export default async function DashboardPage() {
         <CardContent>
           <ul className="space-y-2">
             {activeOrders.map((o) => (
-              <li key={o.id} className="flex justify-between text-sm">
+              <li key={o.id} className="flex items-start justify-between gap-2 text-sm">
                 <Link
                   href={`/orders/${o.id}`}
-                  className="font-medium text-foreground hover:text-gold-bright"
+                  className="min-w-0 flex-1 font-medium text-foreground hover:text-gold-bright"
                 >
                   {o.orderNumber}
                 </Link>

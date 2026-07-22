@@ -34,8 +34,8 @@ export default async function LeadDetailPage({
   const current = lead.status as LeadStatus;
 
   return (
-    <div className="space-y-6">
-      <h1 className="text-2xl font-semibold">
+    <div className="page-content space-y-6">
+      <h1 className="text-xl font-semibold sm:text-2xl">
         Aanvraag #{lead.id} — {lead.title ?? "Zonder titel"}
       </h1>
       <Badge>{lead.status}</Badge>

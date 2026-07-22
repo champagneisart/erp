@@ -11,9 +11,9 @@ export default async function CustomersPage() {
   const rows = await db.select().from(customers).orderBy(desc(customers.createdAt));
 
   return (
-    <div className="space-y-6">
-      <h1 className="text-2xl font-semibold">Klanten</h1>
-      <div className="grid gap-6 lg:grid-cols-2">
+    <div className="page-content space-y-6">
+      <h1 className="text-xl font-semibold sm:text-2xl">Klanten</h1>
+      <div className="grid min-w-0 gap-6 lg:grid-cols-2">
         <Card>
           <CardHeader>
             <CardTitle>Nieuwe klant</CardTitle>
@@ -29,7 +29,7 @@ export default async function CustomersPage() {
                   phone: (fd.get("phone") as string) || undefined,
                 });
               }}
-              className="space-y-3"
+              className="form-stack"
             >
               <Input name="name" placeholder="Naam *" required />
               <Input name="company" placeholder="Bedrijf" />

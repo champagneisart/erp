@@ -6,6 +6,7 @@ import { isAdmin } from "@/lib/auth/permissions";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import {
   createKnowledgeArticle,
   listKnowledgeFiles,
@@ -18,8 +19,8 @@ export default async function KnowledgePage() {
   const files = await listKnowledgeFiles();
 
   return (
-    <div className="space-y-6">
-      <h1 className="text-2xl font-semibold">Kennisbank</h1>
+    <div className="page-content space-y-6">
+      <h1 className="text-xl font-semibold sm:text-2xl">Kennisbank</h1>
       <p className="text-sm text-muted">
         Gebruikt door AI-agents voor tone of voice, FAQ en regels.{" "}
         {isAdmin(session) ? "Admin kan artikelen bewerken (MVP: via database seed)." : ""}
@@ -39,16 +40,16 @@ export default async function KnowledgePage() {
                 tags: (fd.get("tags") as string) || undefined,
               });
             }}
-            className="grid gap-3"
+            className="form-stack"
           >
-            <div className="grid gap-3 md:grid-cols-3">
+            <div className="grid min-w-0 gap-3 md:grid-cols-3">
               <Input name="title" placeholder="Titel" required />
               <Input name="category" placeholder="Categorie" required />
               <Input name="tags" placeholder="Tags (comma)" />
             </div>
-            <textarea
+            <Textarea
               name="content"
-              className="min-h-24 rounded-md border border-gold/25 p-2 text-sm"
+              className="min-h-24"
               placeholder="Inhoud van de kennisbank"
               required
             />
@@ -61,14 +62,9 @@ export default async function KnowledgePage() {
           <CardTitle>Kennisbank-bestanden uploaden</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <form action={uploadKnowledgeFile} className="grid gap-3 md:grid-cols-3">
+          <form action={uploadKnowledgeFile} className="form-stack md:grid-cols-3">
             <Input name="title" placeholder="Titel van bestand" required />
-            <input
-              name="file"
-              type="file"
-              required
-              className="h-10 rounded-md border border-gold/25 px-3 py-1 text-sm"
-            />
+            <input name="file" type="file" required className="field-file" />
             <Button type="submit" variant="outline">
               Upload
             </Button>

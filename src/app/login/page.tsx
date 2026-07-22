@@ -6,8 +6,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 export default function LoginPage() {
   return (
-    <div className="app-shell flex min-h-screen items-center justify-center p-6">
-      <Card className="w-full max-w-md border-gold/30 shadow-[0_0_40px_rgba(201,162,39,0.12)]">
+    <div className="app-shell flex min-h-screen items-center justify-center overflow-x-hidden p-4 sm:p-6">
+      <Card className="w-full max-w-md min-w-0 border-gold/30 shadow-[0_0_40px_rgba(201,162,39,0.12)]">
         <CardHeader>
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-gold">
             Administratie
@@ -28,7 +28,7 @@ export default function LoginPage() {
                     : "/dashboard",
               });
             }}
-            className="space-y-4"
+            className="form-stack"
           >
             <div>
               <label className="mb-1 block text-sm font-medium text-foreground">E-mail</label>

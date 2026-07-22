@@ -10,11 +10,21 @@ import {
 import { BOTTLE_FORMATS } from "@/lib/constants/inventory";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { TableScroll } from "@/components/ui/table-scroll";
 
 function formatEuro(value: string | null) {
   if (!value) return "—";
   return `€ ${value}`;
+}
+
+function productLabel(p: {
+  brand: string | null;
+  name: string;
+  format: string | null;
+}) {
+  return `${p.brand ? `${p.brand} — ` : ""}${p.name}${p.format ? ` (${p.format})` : ""}`;
 }
 
 export default async function InventoryPage() {
@@ -26,15 +36,14 @@ export default async function InventoryPage() {
   const officeStock = rows.filter((r) => r.location.slug === "office");
 
   return (
-    <div className="space-y-8">
+    <div className="page-content space-y-6 sm:space-y-8">
       <div>
-        <h1 className="text-2xl font-semibold">Voorraad</h1>
+        <h1 className="text-xl font-semibold sm:text-2xl">Voorraad</h1>
         <p className="text-sm text-muted">
           Fles types, voorraad kantoor/kunstenaar, en wat er onderweg is
         </p>
       </div>
 
-      {/* Fles types */}
       <Card>
         <CardHeader>
           <CardTitle>Fles types & prijzen</CardTitle>
@@ -53,63 +62,80 @@ export default async function InventoryPage() {
                 sellPriceIncVat: (fd.get("sellPriceIncVat") as string) || undefined,
               });
             }}
-            className="grid gap-3 md:grid-cols-3"
+            className="form-stack md:grid-cols-3"
           >
             <Input name="name" placeholder="Naam (bijv. Ruinart BdB 0,75L)" required />
             <Input name="brand" placeholder="Merk (Ruinart, Moët…)" />
-            <select
-              name="format"
-              className="h-10 rounded-md border border-border bg-background px-3 text-sm"
-            >
+            <Select name="format">
               <option value="">Formaat</option>
               {BOTTLE_FORMATS.map((f) => (
                 <option key={f} value={f}>
                   {f}
                 </option>
               ))}
-            </select>
+            </Select>
             <Input name="purchasePriceExVat" placeholder="Inkoop excl. BTW (35.00)" />
             <Input name="sellPriceExVat" placeholder="Verkoop excl. BTW (214.88)" />
             <Input name="sellPriceIncVat" placeholder="Verkoop incl. BTW (260.00)" />
-            <Button type="submit" className="md:col-span-3 md:max-w-xs">
+            <Button type="submit" className="md:col-span-3 sm:max-w-xs">
               Fles type toevoegen
             </Button>
           </form>
 
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-left text-muted">
-                <th>Naam</th>
-                <th>Merk</th>
-                <th>Formaat</th>
-                <th>Inkoop</th>
-                <th>Verkoop incl.</th>
-              </tr>
-            </thead>
-            <tbody>
-              {products.map((p) => (
-                <tr key={p.id} className="border-t border-border">
-                  <td className="py-2">{p.name}</td>
-                  <td>{p.brand ?? "—"}</td>
-                  <td>{p.format ?? "—"}</td>
-                  <td>{formatEuro(p.purchasePriceExVat)}</td>
-                  <td>{formatEuro(p.sellPriceIncVat)}</td>
+          <ul className="space-y-2 md:hidden">
+            {products.map((p) => (
+              <li key={p.id} className="mobile-card space-y-1 text-sm">
+                <p className="font-medium">{p.name}</p>
+                <div className="flex flex-wrap gap-x-3 gap-y-1 text-muted">
+                  {p.brand && <span>{p.brand}</span>}
+                  {p.format && <span>{p.format}</span>}
+                </div>
+                <div className="flex justify-between pt-1 text-xs">
+                  <span className="text-muted">Inkoop {formatEuro(p.purchasePriceExVat)}</span>
+                  <span>Verkoop {formatEuro(p.sellPriceIncVat)}</span>
+                </div>
+              </li>
+            ))}
+            {products.length === 0 && (
+              <li className="text-sm text-muted">Nog geen fles types</li>
+            )}
+          </ul>
+
+          <TableScroll className="hidden md:block">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left text-muted">
+                  <th className="pr-4">Naam</th>
+                  <th className="pr-4">Merk</th>
+                  <th className="pr-4">Formaat</th>
+                  <th className="pr-4">Inkoop</th>
+                  <th>Verkoop incl.</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {products.map((p) => (
+                  <tr key={p.id} className="border-t border-border">
+                    <td className="py-2 pr-4">{p.name}</td>
+                    <td className="pr-4">{p.brand ?? "—"}</td>
+                    <td className="pr-4">{p.format ?? "—"}</td>
+                    <td className="pr-4">{formatEuro(p.purchasePriceExVat)}</td>
+                    <td>{formatEuro(p.sellPriceIncVat)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </TableScroll>
         </CardContent>
       </Card>
 
-      {/* Voorraad overzicht */}
-      <div className="grid gap-6 md:grid-cols-2">
+      <div className="grid min-w-0 gap-6 md:grid-cols-2">
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
+          <CardHeader className="flex flex-row items-center justify-between gap-2">
             <CardTitle>Kantoor</CardTitle>
             {office && (
               <Link
                 href={`/inventory/log/${office.slug}`}
-                className="text-xs text-muted hover:text-gold-bright"
+                className="shrink-0 text-xs text-muted hover:text-gold-bright"
               >
                 Logboek →
               </Link>
@@ -121,12 +147,9 @@ export default async function InventoryPage() {
                 <li className="text-muted">Nog geen voorraad</li>
               )}
               {officeStock.map(({ product, inv }) => (
-                <li key={product.id} className="flex justify-between">
-                  <span>
-                    {product.brand ? `${product.brand} — ` : ""}
-                    {product.name}
-                  </span>
-                  <span className="font-medium">{inv.quantity}x</span>
+                <li key={product.id} className="flex items-start justify-between gap-2">
+                  <span className="min-w-0 flex-1">{productLabel(product)}</span>
+                  <span className="shrink-0 font-medium">{inv.quantity}x</span>
                 </li>
               ))}
             </ul>
@@ -137,11 +160,11 @@ export default async function InventoryPage() {
           const stock = rows.filter((r) => r.location.id === artistLoc.id);
           return (
             <Card key={artistLoc.id}>
-              <CardHeader className="flex flex-row items-center justify-between">
+              <CardHeader className="flex flex-row items-center justify-between gap-2">
                 <CardTitle>{artistLoc.name}</CardTitle>
                 <Link
                   href={`/inventory/log/${artistLoc.slug}`}
-                  className="text-xs text-muted hover:text-gold-bright"
+                  className="shrink-0 text-xs text-muted hover:text-gold-bright"
                 >
                   Logboek →
                 </Link>
@@ -152,12 +175,9 @@ export default async function InventoryPage() {
                     <li className="text-muted">Nog geen voorraad</li>
                   )}
                   {stock.map(({ product, inv }) => (
-                    <li key={product.id} className="flex justify-between">
-                      <span>
-                        {product.brand ? `${product.brand} — ` : ""}
-                        {product.name}
-                      </span>
-                      <span className="font-medium">{inv.quantity}x</span>
+                    <li key={product.id} className="flex items-start justify-between gap-2">
+                      <span className="min-w-0 flex-1">{productLabel(product)}</span>
+                      <span className="shrink-0 font-medium">{inv.quantity}x</span>
                     </li>
                   ))}
                 </ul>
@@ -167,7 +187,6 @@ export default async function InventoryPage() {
         })}
       </div>
 
-      {/* Transfer kantoor → kunstenaar */}
       {office && artistLocations.length > 0 && (
         <Card>
           <CardHeader>
@@ -188,33 +207,24 @@ export default async function InventoryPage() {
                   note: (fd.get("note") as string) || undefined,
                 });
               }}
-              className="grid max-w-lg gap-3"
+              className="form-stack sm:max-w-lg"
             >
-              <select
-                name="productId"
-                required
-                className="h-10 rounded-md border border-border bg-background px-3 text-sm"
-              >
+              <Select name="productId" required>
                 <option value="">Welke fles?</option>
                 {products.map((p) => (
                   <option key={p.id} value={p.id}>
-                    {p.brand ? `${p.brand} — ` : ""}
-                    {p.name} {p.format ? `(${p.format})` : ""}
+                    {productLabel(p)}
                   </option>
                 ))}
-              </select>
-              <select
-                name="toLocationId"
-                required
-                className="h-10 rounded-md border border-border bg-background px-3 text-sm"
-              >
+              </Select>
+              <Select name="toLocationId" required>
                 <option value="">Naar welke kunstenaar?</option>
                 {artistLocations.map((loc) => (
                   <option key={loc.id} value={loc.id}>
                     {loc.name}
                   </option>
                 ))}
-              </select>
+              </Select>
               <Input name="quantity" type="number" min={1} placeholder="Aantal" required />
               <Input name="note" placeholder="Notitie (optioneel)" />
               <Button type="submit">Verplaatsen</Button>
@@ -223,7 +233,6 @@ export default async function InventoryPage() {
         </Card>
       )}
 
-      {/* Flessen bijboeken */}
       {office && artistLocations.length > 0 && (
         <Card>
           <CardHeader>
@@ -243,26 +252,17 @@ export default async function InventoryPage() {
                   note: (fd.get("note") as string) || undefined,
                 });
               }}
-              className="grid max-w-lg gap-3"
+              className="form-stack sm:max-w-lg"
             >
-              <select
-                name="productId"
-                required
-                className="h-10 rounded-md border border-border bg-background px-3 text-sm"
-              >
+              <Select name="productId" required>
                 <option value="">Welke fles?</option>
                 {products.map((p) => (
                   <option key={p.id} value={p.id}>
-                    {p.brand ? `${p.brand} — ` : ""}
-                    {p.name} {p.format ? `(${p.format})` : ""}
+                    {productLabel(p)}
                   </option>
                 ))}
-              </select>
-              <select
-                name="locationId"
-                required
-                className="h-10 rounded-md border border-border bg-background px-3 text-sm"
-              >
+              </Select>
+              <Select name="locationId" required>
                 <option value="">Waar?</option>
                 <option value={office.id}>Kantoor</option>
                 {artistLocations.map((loc) => (
@@ -270,7 +270,7 @@ export default async function InventoryPage() {
                     {loc.name}
                   </option>
                 ))}
-              </select>
+              </Select>
               <Input name="quantity" type="number" min={1} placeholder="Aantal" required />
               <Input name="note" placeholder="Notitie (optioneel)" />
               <Button type="submit">Bijboeken</Button>
@@ -279,7 +279,6 @@ export default async function InventoryPage() {
         </Card>
       )}
 
-      {/* Onderweg */}
       <Card>
         <CardHeader>
           <CardTitle>Onderweg (besteld, nog niet ontvangen)</CardTitle>
@@ -298,27 +297,18 @@ export default async function InventoryPage() {
                   trackingNumber: (fd.get("trackingNumber") as string) || undefined,
                 });
               }}
-              className="grid gap-3 md:grid-cols-2"
+              className="form-stack md:grid-cols-2"
             >
-              <select
-                name="productId"
-                required
-                className="h-10 rounded-md border border-border bg-background px-3 text-sm"
-              >
+              <Select name="productId" required>
                 <option value="">Fles / merk / formaat</option>
                 {products.map((p) => (
                   <option key={p.id} value={p.id}>
-                    {p.brand ? `${p.brand} — ` : ""}
-                    {p.name} {p.format ? `(${p.format})` : ""}
+                    {productLabel(p)}
                   </option>
                 ))}
-              </select>
+              </Select>
               <Input name="quantity" type="number" min={1} placeholder="Aantal" required />
-              <select
-                name="destinationLocationId"
-                required
-                className="h-10 rounded-md border border-border bg-background px-3 text-sm"
-              >
+              <Select name="destinationLocationId" required>
                 <option value="">Bestemming</option>
                 <option value={office.id}>Kantoor</option>
                 {artistLocations.map((loc) => (
@@ -326,11 +316,11 @@ export default async function InventoryPage() {
                     {loc.name}
                   </option>
                 ))}
-              </select>
+              </Select>
               <Input name="supplierName" placeholder="Leverancier" />
               <Input name="orderReference" placeholder="Ordernummer webshop" />
               <Input name="trackingNumber" placeholder="Track & trace" />
-              <Button type="submit" className="md:col-span-2 md:max-w-xs">
+              <Button type="submit" className="md:col-span-2 sm:max-w-xs">
                 Onderweg registreren
               </Button>
             </form>
@@ -343,12 +333,11 @@ export default async function InventoryPage() {
               {shipments.map(({ shipment, product, location }) => (
                 <li
                   key={shipment.id}
-                  className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border p-3 text-sm"
+                  className="flex flex-col gap-3 rounded-lg border border-border p-3 text-sm sm:flex-row sm:items-center sm:justify-between"
                 >
-                  <div>
+                  <div className="min-w-0">
                     <p className="font-medium">
-                      {product.brand ? `${product.brand} — ` : ""}
-                      {product.name} ({product.format ?? "?"}) × {shipment.quantityOrdered}
+                      {productLabel(product)} × {shipment.quantityOrdered}
                     </p>
                     <p className="text-muted">
                       → {location.name}
@@ -361,8 +350,9 @@ export default async function InventoryPage() {
                       "use server";
                       await markShipmentReceived(shipment.id);
                     }}
+                    className="shrink-0"
                   >
-                    <Button type="submit" variant="outline">
+                    <Button type="submit" variant="outline" className="w-full sm:w-auto">
                       Ontvangen
                     </Button>
                   </form>

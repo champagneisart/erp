@@ -3,6 +3,8 @@ import { db } from "@/lib/db";
 import { messageDrafts, messages } from "@/db/schema";
 import { createInboundMessage, approveDraft } from "@/lib/actions/inbox";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 
@@ -15,8 +17,8 @@ export default async function InboxPage() {
     .limit(20);
 
   return (
-    <div className="space-y-6">
-      <h1 className="text-2xl font-semibold">Inbox</h1>
+    <div className="page-content space-y-6">
+      <h1 className="text-xl font-semibold sm:text-2xl">Inbox</h1>
       <Card>
         <CardHeader>
           <CardTitle>Bericht plakken (handmatig)</CardTitle>
@@ -31,18 +33,14 @@ export default async function InboxPage() {
                 channel: "manual",
               });
             }}
-            className="space-y-3"
+            className="form-stack"
           >
-            <input
-              name="subject"
-              placeholder="Onderwerp"
-              className="h-10 w-full rounded-md border px-3 text-sm"
-            />
-            <textarea
+            <Input name="subject" placeholder="Onderwerp" />
+            <Textarea
               name="body"
               required
               placeholder="Plak e-mail of WhatsApp-bericht hier..."
-              className="min-h-32 w-full rounded-md border p-3 text-sm"
+              className="min-h-32"
             />
             <Button type="submit">Analyseren & concept maken</Button>
           </form>
@@ -69,7 +67,7 @@ export default async function InboxPage() {
                       }}
                       className="mt-2"
                     >
-                      <Button type="submit" variant="secondary">
+                      <Button type="submit" variant="secondary" className="w-full sm:w-auto">
                         Concept goedkeuren (kopiëren)
                       </Button>
                     </form>

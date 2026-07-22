@@ -20,13 +20,13 @@ export default async function AccountPage() {
   const backHref = user.role === "artist" ? "/artist" : "/dashboard";
 
   return (
-    <div className="app-shell min-h-screen p-6">
-      <div className="mx-auto max-w-lg space-y-6">
+    <div className="app-shell min-h-screen overflow-x-hidden p-4 sm:p-6">
+      <div className="page-content mx-auto max-w-lg space-y-6">
         <div>
           <Link href={backHref} className="text-sm text-muted hover:text-gold-bright">
             ← Terug
           </Link>
-          <h1 className="mt-2 text-2xl font-semibold">Mijn account</h1>
+          <h1 className="mt-2 text-xl font-semibold sm:text-2xl">Mijn account</h1>
         </div>
 
         <Card>
@@ -42,7 +42,7 @@ export default async function AccountPage() {
                   email: fd.get("email") as string,
                 });
               }}
-              className="grid gap-3"
+              className="form-stack"
             >
               <Input name="name" defaultValue={user.name} required />
               <Input name="email" type="email" defaultValue={user.email} required />
@@ -67,7 +67,7 @@ export default async function AccountPage() {
                   newPassword: fd.get("newPassword") as string,
                 });
               }}
-              className="grid gap-3"
+              className="form-stack"
             >
               <Input
                 name="currentPassword"

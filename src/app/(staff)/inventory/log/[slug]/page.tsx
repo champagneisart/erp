@@ -6,6 +6,7 @@ import { MOVEMENT_TYPE_LABELS } from "@/lib/constants/inventory";
 import { formatDateTime } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { TableScroll } from "@/components/ui/table-scroll";
 
 function describeMovement(
   movement: {
@@ -57,7 +58,7 @@ export default async function InventoryLogPage({
   const entries = await getLocationLogbook(location.id);
 
   return (
-    <div className="space-y-6">
+    <div className="page-content space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <p className="text-sm text-muted">
@@ -65,13 +66,13 @@ export default async function InventoryLogPage({
               ← Voorraad
             </Link>
           </p>
-          <h1 className="text-2xl font-semibold">Logboek: {location.name}</h1>
+          <h1 className="text-xl font-semibold sm:text-2xl">Logboek: {location.name}</h1>
           <p className="text-sm text-muted">
             Alle bijboekingen, leveringen, verplaatsingen en afboekingen
           </p>
         </div>
-        <Link href="/inventory">
-          <Button variant="outline">Terug naar voorraad</Button>
+        <Link href="/inventory" className="block sm:inline">
+          <Button variant="outline" className="w-full sm:w-auto">Terug naar voorraad</Button>
         </Link>
       </div>
 
@@ -83,17 +84,8 @@ export default async function InventoryLogPage({
           {entries.length === 0 ? (
             <p className="text-sm text-muted">Nog geen mutaties geregistreerd.</p>
           ) : (
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-left text-muted">
-                  <th>Datum & tijd</th>
-                  <th>Product</th>
-                  <th>Actie</th>
-                  <th>Notitie</th>
-                  <th>Door</th>
-                </tr>
-              </thead>
-              <tbody>
+            <>
+              <ul className="space-y-2 md:hidden">
                 {entries.map(({ movement, product, user, fromName, toName }) => {
                   const { sign, text } = describeMovement(
                     movement,
@@ -102,26 +94,66 @@ export default async function InventoryLogPage({
                     toName ?? null
                   );
                   return (
-                    <tr key={movement.id} className="border-t border-border">
-                      <td className="py-2 whitespace-nowrap">
-                        {formatDateTime(movement.createdAt)}
-                      </td>
-                      <td>
+                    <li key={movement.id} className="mobile-card space-y-1 text-sm">
+                      <p className="text-xs text-muted">{formatDateTime(movement.createdAt)}</p>
+                      <p className="font-medium">
                         {product.brand ? `${product.brand} — ` : ""}
                         {product.name}
                         {product.format ? ` (${product.format})` : ""}
-                      </td>
-                      <td className={sign === "-" ? "text-red-400" : "text-emerald-400"}>
+                      </p>
+                      <p className={sign === "-" ? "text-red-400" : "text-emerald-400"}>
                         {sign}
                         {text}
-                      </td>
-                      <td className="text-muted">{movement.note ?? "—"}</td>
-                      <td className="text-muted">{user?.name ?? "Systeem"}</td>
-                    </tr>
+                      </p>
+                      {movement.note && <p className="text-muted">{movement.note}</p>}
+                      <p className="text-xs text-muted">{user?.name ?? "Systeem"}</p>
+                    </li>
                   );
                 })}
-              </tbody>
-            </table>
+              </ul>
+
+              <TableScroll className="hidden md:block">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="text-left text-muted">
+                      <th className="pr-4">Datum & tijd</th>
+                      <th className="pr-4">Product</th>
+                      <th className="pr-4">Actie</th>
+                      <th className="pr-4">Notitie</th>
+                      <th>Door</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {entries.map(({ movement, product, user, fromName, toName }) => {
+                      const { sign, text } = describeMovement(
+                        movement,
+                        location.id,
+                        fromName ?? null,
+                        toName ?? null
+                      );
+                      return (
+                        <tr key={movement.id} className="border-t border-border">
+                          <td className="py-2 pr-4 whitespace-nowrap">
+                            {formatDateTime(movement.createdAt)}
+                          </td>
+                          <td className="pr-4">
+                            {product.brand ? `${product.brand} — ` : ""}
+                            {product.name}
+                            {product.format ? ` (${product.format})` : ""}
+                          </td>
+                          <td className={`pr-4 ${sign === "-" ? "text-red-400" : "text-emerald-400"}`}>
+                            {sign}
+                            {text}
+                          </td>
+                          <td className="pr-4 text-muted">{movement.note ?? "—"}</td>
+                          <td className="text-muted">{user?.name ?? "Systeem"}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </TableScroll>
+            </>
           )}
         </CardContent>
       </Card>

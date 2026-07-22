@@ -23,7 +23,7 @@ export function TopNav() {
   const pathname = usePathname();
 
   return (
-    <nav className="flex flex-wrap items-center gap-1.5">
+    <nav className="nav-scroll flex flex-nowrap items-center gap-2">
       {links.map((link) => {
         const active =
           pathname === link.href || pathname.startsWith(`${link.href}/`);

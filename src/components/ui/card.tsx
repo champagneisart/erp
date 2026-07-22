@@ -7,7 +7,7 @@ export function Card({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
 
 export function CardHeader({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
   return (
-    <div className={cn("border-b border-gold/15 px-6 py-4", className)} {...props} />
+    <div className={cn("border-b border-gold/15 px-4 py-3 sm:px-6 sm:py-4", className)} {...props} />
   );
 }
 
@@ -18,5 +18,5 @@ export function CardTitle({ className, ...props }: HTMLAttributes<HTMLHeadingEle
 }
 
 export function CardContent({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
-  return <div className={cn("px-6 py-4", className)} {...props} />;
+  return <div className={cn("px-4 py-3 sm:px-6 sm:py-4", className)} {...props} />;
 }
