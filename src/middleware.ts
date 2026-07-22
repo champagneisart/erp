@@ -63,7 +63,21 @@ export async function middleware(request: NextRequest) {
       }
     : null;
   const isLogin = pathname === "/login";
+  const isAuthPublic =
+    isLogin ||
+    pathname === "/forgot-password" ||
+    pathname.startsWith("/reset-password/");
+  const isAccount = pathname === "/account";
   const isPublicPortal = pathname.startsWith("/portal");
+
+  if (isAuthPublic && !session) {
+    return NextResponse.next();
+  }
+
+  if (isAccount) {
+    if (!session) return NextResponse.redirect(new URL("/login", request.url));
+    return NextResponse.next();
+  }
 
   if (isPublicPortal && hostType !== "app") {
     return NextResponse.next();

@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { signIn } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -42,8 +43,9 @@ export default function LoginPage() {
             </Button>
           </form>
           <p className="mt-4 text-xs text-muted">
-            Demo: admin@champagneisart.nl / admin123 — kunstenaar: artist@champagneisart.nl /
-            artist123
+            <Link href="/forgot-password" className="hover:text-gold-bright">
+              Wachtwoord vergeten?
+            </Link>
           </p>
         </CardContent>
       </Card>

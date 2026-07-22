@@ -1,19 +1,28 @@
-import { db } from "@/lib/db";
-import { appSettings, users } from "@/db/schema";
 import { auth } from "@/lib/auth";
 import { isAdmin } from "@/lib/auth/permissions";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  createUser,
+  getAllUsers,
+  getCurrentUser,
+  updateUser,
+} from "@/lib/actions/users";
 import {
   runOpenAiHealthCheckAction,
   upsertSetting,
 } from "@/lib/actions/ai-studio";
+import { db } from "@/lib/db";
+import { appSettings } from "@/db/schema";
+import { isMailjetConfigured } from "@/lib/email/mailjet";
 import { eq } from "drizzle-orm";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 export default async function SettingsPage() {
   const session = await auth();
-  const allUsers = isAdmin(session) ? await db.select().from(users) : [];
+  const currentUser = await getCurrentUser();
+  const allUsers = isAdmin(session) ? await getAllUsers() : [];
+
   const [openAiSetting] = await db
     .select()
     .from(appSettings)
@@ -50,9 +59,130 @@ export default async function SettingsPage() {
     .where(eq(appSettings.key, "openai_health_trigger"))
     .limit(1);
 
+  const mailjetReady = isMailjetConfigured();
+
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-semibold">Instellingen</h1>
+
+      {currentUser && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Mijn account</CardTitle>
+          </CardHeader>
+          <CardContent className="text-sm text-muted space-y-2">
+            <p>
+              {currentUser.name} — {currentUser.email} ({currentUser.role})
+            </p>
+            <a href="/account" className="text-gold-bright hover:underline">
+              Profiel & wachtwoord wijzigen →
+            </a>
+          </CardContent>
+        </Card>
+      )}
+
+      {isAdmin(session) && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Gebruikersbeheer</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <form
+              action={async (fd) => {
+                "use server";
+                await createUser({
+                  name: fd.get("name") as string,
+                  email: fd.get("email") as string,
+                  password: fd.get("password") as string,
+                  role: fd.get("role") as "admin" | "staff" | "artist",
+                });
+              }}
+              className="grid max-w-lg gap-3 rounded-lg border border-border p-4"
+            >
+              <p className="text-sm font-medium">Nieuwe gebruiker</p>
+              <Input name="name" placeholder="Naam" required />
+              <Input name="email" type="email" placeholder="E-mail" required />
+              <Input
+                name="password"
+                type="password"
+                minLength={8}
+                placeholder="Tijdelijk wachtwoord"
+                required
+              />
+              <select
+                name="role"
+                required
+                className="h-10 rounded-md border border-border bg-background px-3 text-sm"
+              >
+                <option value="staff">Staff</option>
+                <option value="artist">Kunstenaar</option>
+                <option value="admin">Admin</option>
+              </select>
+              <Button type="submit">Gebruiker aanmaken</Button>
+            </form>
+
+            <div className="space-y-4">
+              {allUsers.map((u) => (
+                <form
+                  key={u.id}
+                  action={async (fd) => {
+                    "use server";
+                    await updateUser(u.id, {
+                      name: fd.get("name") as string,
+                      email: fd.get("email") as string,
+                      role: fd.get("role") as "admin" | "staff" | "artist",
+                      password: (fd.get("password") as string) || undefined,
+                    });
+                  }}
+                  className="grid gap-2 rounded-lg border border-border p-4 md:grid-cols-2"
+                >
+                  <Input name="name" defaultValue={u.name} />
+                  <Input name="email" type="email" defaultValue={u.email} />
+                  <select
+                    name="role"
+                    defaultValue={u.role}
+                    className="h-10 rounded-md border border-border bg-background px-3 text-sm"
+                  >
+                    <option value="admin">Admin</option>
+                    <option value="staff">Staff</option>
+                    <option value="artist">Kunstenaar</option>
+                  </select>
+                  <Input
+                    name="password"
+                    type="password"
+                    placeholder="Nieuw wachtwoord (optioneel)"
+                    minLength={8}
+                  />
+                  <Button type="submit" variant="outline" className="md:col-span-2 md:max-w-xs">
+                    Opslaan
+                  </Button>
+                </form>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {isAdmin(session) && (
+        <Card>
+          <CardHeader>
+            <CardTitle>E-mail (Mailjet)</CardTitle>
+          </CardHeader>
+          <CardContent className="text-sm text-muted space-y-2">
+            <p>
+              Status:{" "}
+              <span className={mailjetReady ? "text-emerald-400" : "text-amber-400"}>
+                {mailjetReady ? "Mailjet gekoppeld" : "Nog niet gekoppeld"}
+              </span>
+            </p>
+            <p>
+              Wachtwoord vergeten werkt pas automatisch per mail als je Mailjet env vars instelt
+              in Vercel (.env.example). Zonder Mailjet kan admin wachtwoorden resetten hierboven.
+            </p>
+          </CardContent>
+        </Card>
+      )}
+
       <Card>
         <CardHeader>
           <CardTitle>Omgeving</CardTitle>
@@ -131,10 +261,6 @@ export default async function SettingsPage() {
                 Test OpenAI koppeling nu
               </Button>
             </form>
-            <p className="text-xs text-muted">
-              Automatische check: 1× per dag via Vercel cron (Hobby-plan). Handmatig
-              testen kan altijd via de knop hierboven.
-            </p>
           </CardContent>
         </Card>
       )}
@@ -144,9 +270,6 @@ export default async function SettingsPage() {
             <CardTitle>Werkbon-app integratie</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            <p className="text-sm text-muted">
-              Vul URL in van je bestaande werkbon-app (webhook/API endpoint) om later automatisch werkbonnen door te sturen.
-            </p>
             <form
               action={async (fd) => {
                 "use server";
@@ -166,22 +289,6 @@ export default async function SettingsPage() {
                 Opslaan
               </Button>
             </form>
-          </CardContent>
-        </Card>
-      )}
-      {isAdmin(session) && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Gebruikers</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ul className="text-sm space-y-1">
-              {allUsers.map((u) => (
-                <li key={u.id}>
-                  {u.name} — {u.email} ({u.role})
-                </li>
-              ))}
-            </ul>
           </CardContent>
         </Card>
       )}

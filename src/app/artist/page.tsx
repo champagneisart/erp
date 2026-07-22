@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { getArtistOrders, addArtistEvent } from "@/lib/actions/artist";
@@ -30,6 +31,11 @@ export default async function ArtistPortalPage() {
             Uitloggen
           </Button>
         </form>
+        <Link href="/account">
+          <Button type="button" variant="outline">
+            Mijn account
+          </Button>
+        </Link>
       </header>
       <div className="grid gap-4">
         {artistOrders.length === 0 && (
