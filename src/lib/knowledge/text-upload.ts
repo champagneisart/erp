@@ -16,12 +16,23 @@ export function titleFromFileName(fileName: string): string {
     .trim();
 }
 
+export function readTextFromBuffer(bytes: Buffer, maxBytes = MAX_TEXT_BYTES): string {
+  if (bytes.length > maxBytes) {
+    throw new Error("Tekstbestand is te groot (max. 500 KB)");
+  }
+  const text = bytes.toString("utf-8").trim();
+  if (!text) throw new Error("Bestand bevat geen tekst");
+  return text;
+}
+
 export async function readUploadText(file: File): Promise<string> {
   if (file.size > MAX_TEXT_BYTES) {
     throw new Error("Tekstbestand is te groot (max. 500 KB)");
   }
   const text = await file.text();
-  return text.trim();
+  const trimmed = text.trim();
+  if (!trimmed) throw new Error("Bestand bevat geen tekst");
+  return trimmed;
 }
 
 /** Beperk tokens bij injectie in prompts — ruwe markdown mag groter zijn in DB. */

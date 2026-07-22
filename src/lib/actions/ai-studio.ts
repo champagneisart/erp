@@ -11,13 +11,16 @@ import {
 } from "@/db/schema";
 import { auth } from "@/lib/auth";
 import { assertAdmin, assertStaff } from "@/lib/auth/permissions";
-import { storeUploadedFile } from "@/lib/actions/file-storage";
+import {
+  storeUploadedBytes,
+} from "@/lib/actions/file-storage";
 import { performOpenAiHealthCheck } from "@/lib/ai/health-check";
 import {
   isTextKnowledgeFile,
-  readUploadText,
+  readTextFromBuffer,
   titleFromFileName,
 } from "@/lib/knowledge/text-upload";
+import { sanitizeUploadFileName } from "@/lib/knowledge/file-utils";
 
 export async function upsertSetting(key: string, value: string) {
   const session = await auth();
@@ -123,13 +126,15 @@ export async function uploadAiTrainingFile(formData: FormData) {
   const file = formData.get("file") as File | null;
   if (!file) throw new Error("Bestand is verplicht");
 
+  const bytes = Buffer.from(await file.arrayBuffer());
+  const mimeType = file.type || "application/octet-stream";
+  const safeName = sanitizeUploadFileName(file.name || `upload-${Date.now()}.md`);
   const title = titleInput || titleFromFileName(file.name);
-  const stored = await storeUploadedFile(file, "ai-studio");
 
   let trainingItemId: number | null = null;
 
-  if (isTextKnowledgeFile(stored.fileName, stored.mimeType)) {
-    const content = await readUploadText(file);
+  if (isTextKnowledgeFile(safeName, mimeType)) {
+    const content = readTextFromBuffer(bytes);
     const [item] = await db
       .insert(aiTrainingItems)
       .values({
@@ -143,14 +148,23 @@ export async function uploadAiTrainingFile(formData: FormData) {
     trainingItemId = item.id;
   }
 
-  await db.insert(aiTrainingFiles).values({
-    trainingItemId,
-    title,
-    agentId: agentIdRaw ? Number(agentIdRaw) : null,
-    fileName: stored.fileName,
-    fileUrl: stored.url,
-    mimeType: stored.mimeType,
-  });
+  try {
+    const stored = await storeUploadedBytes(bytes, safeName, mimeType, "ai-studio");
+    await db.insert(aiTrainingFiles).values({
+      trainingItemId,
+      title,
+      agentId: agentIdRaw ? Number(agentIdRaw) : null,
+      fileName: stored.fileName,
+      fileUrl: stored.url,
+      mimeType: stored.mimeType,
+    });
+  } catch (blobError) {
+    if (!trainingItemId) {
+      const message =
+        blobError instanceof Error ? blobError.message : "Bestand uploaden mislukt";
+      throw new Error(message);
+    }
+  }
 
   revalidatePath("/ai-studio");
 }

@@ -6,12 +6,15 @@ import { db } from "@/lib/db";
 import { aiAgentProfiles, aiTrainingItems, kbArticles, kbFiles } from "@/db/schema";
 import { auth } from "@/lib/auth";
 import { assertStaff } from "@/lib/auth/permissions";
-import { storeUploadedFile } from "@/lib/actions/file-storage";
+import {
+  storeUploadedBytes,
+} from "@/lib/actions/file-storage";
 import {
   isTextKnowledgeFile,
-  readUploadText,
+  readTextFromBuffer,
   titleFromFileName,
 } from "@/lib/knowledge/text-upload";
+import { sanitizeUploadFileName } from "@/lib/knowledge/file-utils";
 
 export async function createKnowledgeArticle(data: {
   title: string;
@@ -44,15 +47,17 @@ export async function uploadKnowledgeFile(formData: FormData) {
   const titleInput = ((formData.get("title") as string) || "").trim();
   const category = ((formData.get("category") as string) || "import").trim();
   const file = formData.get("file") as File | null;
-  if (!file) throw new Error("Bestand is verplicht");
+  if (!file || file.size === 0) throw new Error("Bestand is verplicht");
 
+  const bytes = Buffer.from(await file.arrayBuffer());
+  const mimeType = file.type || "application/octet-stream";
+  const safeName = sanitizeUploadFileName(file.name || `upload-${Date.now()}.md`);
   const title = titleInput || titleFromFileName(file.name);
-  const stored = await storeUploadedFile(file, "knowledge");
 
   let articleId: number | null = null;
 
-  if (isTextKnowledgeFile(stored.fileName, stored.mimeType)) {
-    const content = await readUploadText(file);
+  if (isTextKnowledgeFile(safeName, mimeType)) {
+    const content = readTextFromBuffer(bytes);
     const [article] = await db
       .insert(kbArticles)
       .values({
@@ -66,13 +71,23 @@ export async function uploadKnowledgeFile(formData: FormData) {
     articleId = article.id;
   }
 
-  await db.insert(kbFiles).values({
-    articleId,
-    title,
-    fileName: stored.fileName,
-    fileUrl: stored.url,
-    mimeType: stored.mimeType,
-  });
+  try {
+    const stored = await storeUploadedBytes(bytes, safeName, mimeType, "knowledge");
+    await db.insert(kbFiles).values({
+      articleId,
+      title,
+      fileName: stored.fileName,
+      fileUrl: stored.url,
+      mimeType: stored.mimeType,
+    });
+  } catch (blobError) {
+    if (!articleId) {
+      const message =
+        blobError instanceof Error ? blobError.message : "Bestand uploaden mislukt";
+      throw new Error(message);
+    }
+    // Tekst staat in kennisbank; blob-backup is optioneel op Vercel zonder Blob-store
+  }
 
   revalidatePath("/knowledge");
 }
