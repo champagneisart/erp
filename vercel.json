@@ -2,7 +2,7 @@
   "crons": [
     {
       "path": "/api/openai-health",
-      "schedule": "*/15 * * * *"
+      "schedule": "0 7 * * *"
     }
   ]
 }

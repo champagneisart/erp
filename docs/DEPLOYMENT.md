@@ -31,7 +31,7 @@ CRON_SECRET=
 
 3. Deploy
 
-Tip: koppel Neon direct via Vercel Integrations → Neon (zet `DATABASE_URL` automatisch).
+**Cron (Hobby-plan):** OpenAI healthcheck draait 1× per dag (`0 7 * * *` UTC). Vaker vereist Vercel Pro, of test handmatig via Instellingen.
 
 ## 3. Domeinen
 

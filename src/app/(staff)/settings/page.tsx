@@ -132,8 +132,8 @@ export default async function SettingsPage() {
               </Button>
             </form>
             <p className="text-xs text-muted">
-              Voor automatische checks: maak een cronjob naar{" "}
-              <code>/api/openai-health</code> met <code>CRON_SECRET</code>.
+              Automatische check: 1× per dag via Vercel cron (Hobby-plan). Handmatig
+              testen kan altijd via de knop hierboven.
             </p>
           </CardContent>
         </Card>
