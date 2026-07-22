@@ -11,11 +11,13 @@ export function verifyWebhookRequest(request: Request): NextResponse | null {
 
   const authHeader = request.headers.get("authorization");
   const headerSecret = request.headers.get("x-webhook-secret");
+  const url = new URL(request.url);
+  const querySecret = url.searchParams.get("secret") ?? url.searchParams.get("key") ?? "";
 
   const provided =
     authHeader?.startsWith("Bearer ")
       ? authHeader.slice(7)
-      : headerSecret ?? "";
+      : headerSecret ?? querySecret;
 
   if (provided !== secret) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });

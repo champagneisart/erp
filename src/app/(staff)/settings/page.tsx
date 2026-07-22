@@ -13,6 +13,11 @@ import {
 import { db } from "@/lib/db";
 import { appSettings } from "@/db/schema";
 import { isMailjetConfigured } from "@/lib/email/mailjet";
+import {
+  getWebhookFormsUrlForAvada,
+  isWebhookConfigured,
+} from "@/lib/webhooks/config";
+import { getWebhookCaptures, isWebhookProcessingEnabled } from "@/lib/webhooks/capture";
 import { eq } from "drizzle-orm";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -61,6 +66,10 @@ export default async function SettingsPage() {
     .limit(1);
 
   const mailjetReady = isMailjetConfigured();
+  const webhookReady = isWebhookConfigured();
+  const avadaWebhookUrl = getWebhookFormsUrlForAvada();
+  const webhookCaptures = isAdmin(session) ? await getWebhookCaptures() : [];
+  const webhookProcessing = isWebhookProcessingEnabled();
 
   return (
     <div className="page-content space-y-6">
@@ -172,6 +181,60 @@ export default async function SettingsPage() {
               Wachtwoord vergeten werkt pas automatisch per mail als je Mailjet env vars instelt
               in Vercel (.env.example). Zonder Mailjet kan admin wachtwoorden resetten hierboven.
             </p>
+          </CardContent>
+        </Card>
+      )}
+
+      {isAdmin(session) && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Avada webhook</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4 text-sm">
+            <p>
+              Status:{" "}
+              <span className={webhookReady ? "text-emerald-400" : "text-amber-400"}>
+                {webhookReady ? "WEBHOOK_SECRET ingesteld" : "WEBHOOK_SECRET ontbreekt in Vercel"}
+              </span>
+            </p>
+            <div className="space-y-1">
+              <p className="font-medium text-foreground">URL voor Avada-formulier (Action → Webhook)</p>
+              <p className="break-all rounded-md border border-border bg-background/50 p-3 font-mono text-xs text-foreground">
+                {avadaWebhookUrl}
+              </p>
+              <p className="text-muted">
+                Plak deze URL in elk Avada-formulier. Het secret zit in de query string — Avada kan
+                geen custom headers. Nu alleen <strong>capture</strong>: payloads worden opgeslagen
+                hieronder. Verwerking naar leads/orders volgt later (
+                <code className="text-foreground">WEBHOOK_PROCESS=true</code> in Vercel).
+              </p>
+            </div>
+            {webhookCaptures.length === 0 ? (
+              <p className="text-muted">Nog geen formulieren ontvangen. Dien een test in op de website.</p>
+            ) : (
+              <div className="space-y-3">
+                <p className="font-medium text-foreground">
+                  Laatste ontvangen ({webhookCaptures.length})
+                </p>
+                {webhookCaptures.slice(0, 5).map((capture) => (
+                  <details
+                    key={capture.id}
+                    className="rounded-md border border-border bg-background/30 p-3"
+                  >
+                    <summary className="cursor-pointer text-foreground">
+                      {new Date(capture.receivedAt).toLocaleString("nl-NL")} —{" "}
+                      {Object.keys(capture.flat).length} velden ({capture.contentType})
+                    </summary>
+                    <pre className="mt-3 max-h-64 overflow-auto whitespace-pre-wrap break-all text-xs text-muted">
+                      {JSON.stringify(capture.flat, null, 2)}
+                    </pre>
+                  </details>
+                ))}
+              </div>
+            )}
+            {webhookProcessing && (
+              <p className="text-emerald-400">WEBHOOK_PROCESS=true — automatische verwerking staat aan.</p>
+            )}
           </CardContent>
         </Card>
       )}

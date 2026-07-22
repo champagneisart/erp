@@ -27,7 +27,12 @@ export type NormalizedFormData = {
   raw: Record<string, string>;
 };
 
-const FIELD_ALIASES: Record<string, Exclude<keyof NormalizedFormData, "formType" | "extra" | "raw">> = {
+type MappableField = Exclude<
+  keyof NormalizedFormData,
+  "formType" | "formId" | "formName" | "extra" | "raw"
+>;
+
+const FIELD_ALIASES: Record<string, MappableField> = {
   naam: "name",
   name: "name",
   volledige_naam: "name",
@@ -90,6 +95,63 @@ const FIELD_ALIASES: Record<string, Exclude<keyof NormalizedFormData, "formType"
   deadline: "deadline",
   leverdatum: "deadline",
 };
+
+function resolveFieldAlias(key: string): MappableField | null {
+  if (FIELD_ALIASES[key]) return FIELD_ALIASES[key];
+
+  const k = key.toLowerCase();
+  if (k.includes("email") || k.includes("e_mail") || k.endsWith("_mail")) return "email";
+  if (k.includes("telefoon") || k.includes("phone") || k.includes("mobiel") || k.includes("tel"))
+    return "phone";
+  if (k.includes("bedrijf") || k.includes("company") || k.includes("organisatie")) return "company";
+  if (k.includes("ordernummer") || k.includes("order_number") || k.includes("bestelnummer"))
+    return "orderNumber";
+  if (k.includes("voorkant") || k.includes("front")) return "frontDesign";
+  if (k.includes("achterkant") || k.includes("back_design") || k === "back") return "backDesign";
+  if (k.includes("kleur") || k.includes("color")) return "colorScheme";
+  if (k.includes("thema") || k.includes("theme")) return "theme";
+  if (k.includes("logo")) return "logosNotes";
+  if (k === "naam" || k.includes("full_name") || k.includes("volledige") || k.endsWith("_name"))
+    return "name";
+  if (k.includes("bericht") || k.includes("message") || k.includes("opmerking") || k.includes("vraag"))
+    return "message";
+  if (k.includes("aantal") || k.includes("quantity")) return "quantity";
+
+  return null;
+}
+
+function extractFormMeta(body: Record<string, unknown>, flat: Record<string, string>) {
+  const formId =
+    flat.form_id ??
+    flat.fusion_form_id ??
+    flat.formid ??
+    (typeof body.form_id === "string" ? body.form_id : undefined) ??
+    (typeof body.fusion_form_id === "number" ? String(body.fusion_form_id) : undefined);
+
+  const formName =
+    flat.form_name ??
+    flat.form_title ??
+    flat.form_naam ??
+    (typeof body.form_name === "string" ? body.form_name : undefined) ??
+    (typeof body.form_title === "string" ? body.form_title : undefined);
+
+  return { formId, formName };
+}
+
+function combineNameParts(flat: Record<string, string>, data: NormalizedFormData) {
+  if (data.name) return;
+  const parts = [
+    flat.voornaam,
+    flat.first_name,
+    flat.firstname,
+    flat.achternaam,
+    flat.last_name,
+    flat.lastname,
+  ].filter(Boolean);
+  if (parts.length > 0) {
+    data.name = [...new Set(parts)].join(" ").trim();
+  }
+}
 
 function normalizeKey(key: string): string {
   return key
@@ -157,6 +219,7 @@ export function normalizeFormPayload(
   queryType?: string | null
 ): NormalizedFormData {
   const flat = flattenPayload(body);
+  const meta = extractFormMeta(body, flat);
 
   const formTypeRaw =
     queryType ??
@@ -170,8 +233,8 @@ export function normalizeFormPayload(
 
   const data: NormalizedFormData = {
     formType,
-    formId: flat.form_id ?? flat.fusion_form_id ?? flat.formid,
-    formName: flat.form_name ?? flat.form_title ?? flat.form_naam,
+    formId: meta.formId,
+    formName: meta.formName,
     extra: {},
     raw: flat,
   };
@@ -179,7 +242,7 @@ export function normalizeFormPayload(
   const mappedKeys = new Set<string>();
 
   for (const [key, value] of Object.entries(flat)) {
-    const alias = FIELD_ALIASES[key];
+    const alias = resolveFieldAlias(key);
     if (!alias) {
       continue;
     }
@@ -199,9 +262,18 @@ export function normalizeFormPayload(
     (data as Record<string, unknown>)[alias] = value;
   }
 
+  combineNameParts(flat, data);
+
   for (const [key, value] of Object.entries(flat)) {
     if (mappedKeys.has(key) || key === "form_type" || key === "type") continue;
-    if (key.startsWith("fusion_") || key === "form_id" || key === "post_id") continue;
+    if (
+      key.startsWith("fusion_") ||
+      key === "form_id" ||
+      key === "form_name" ||
+      key === "form_title" ||
+      key === "post_id"
+    )
+      continue;
     data.extra[key] = value;
   }
 

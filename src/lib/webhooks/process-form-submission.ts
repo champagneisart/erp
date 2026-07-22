@@ -1,4 +1,5 @@
 import { desc, eq } from "drizzle-orm";
+import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
 import {
   customers,
@@ -16,6 +17,14 @@ import {
   type MessageClassification,
 } from "@/lib/ai";
 import type { NormalizedFormData } from "@/lib/webhooks/parse-form-payload";
+
+function revalidateWebhookPages() {
+  revalidatePath("/leads");
+  revalidatePath("/inbox");
+  revalidatePath("/tasks");
+  revalidatePath("/dashboard");
+  revalidatePath("/orders");
+}
 
 async function findOrCreateCustomer(data: {
   name?: string;
@@ -227,6 +236,8 @@ export async function processContactForm(data: NormalizedFormData) {
     toValue: "website",
   });
 
+  revalidateWebhookPages();
+
   return {
     formType: "contact" as const,
     leadId: lead.id,
@@ -278,6 +289,8 @@ export async function processAanvraagForm(data: NormalizedFormData) {
     toValue: "website",
   });
 
+  revalidateWebhookPages();
+
   return {
     formType: "aanvraag" as const,
     leadId: lead.id,
@@ -305,6 +318,8 @@ export async function processOntwerpdetailsForm(data: NormalizedFormData) {
       action: "webhook_ontwerpdetails",
       toValue: "website",
     });
+
+    revalidateWebhookPages();
 
     return {
       formType: "ontwerpdetails" as const,
@@ -373,6 +388,8 @@ export async function processOntwerpdetailsForm(data: NormalizedFormData) {
     customerId: customer?.id,
     leadId: leadId ?? undefined,
   });
+
+  revalidateWebhookPages();
 
   return {
     formType: "ontwerpdetails" as const,
