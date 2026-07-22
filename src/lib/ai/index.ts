@@ -1,6 +1,3 @@
-import { eq, like, or } from "drizzle-orm";
-import { db } from "@/lib/db";
-import { appSettings, kbArticles } from "@/db/schema";
 import { parseInquiryText, parsedToLeadFields } from "@/lib/ai/parse-inquiry";
 import { getOpenAiChatModel, getOpenAiKey } from "@/lib/ai/config";
 
@@ -199,30 +196,25 @@ export async function generateCustomerReply(context: {
   classification: string;
 }): Promise<string> {
   const parsed = parseInquiryText(context.messageBody);
-  const naam = parsed.name?.split(" ")[0] ?? "klant";
-
-  const articles = await db
-    .select()
-    .from(kbArticles)
-    .where(
-      or(
-        like(kbArticles.category, "%tone%"),
-        like(kbArticles.category, "%faq%")
-      )
-    )
-    .limit(3);
-
-  const tone =
-    articles[0]?.content?.slice(0, 200) ??
-    "Vriendelijk en professioneel, Champagne is Art Studio.";
+  const voornaam = parsed.name?.split(" ")[0];
+  const aanhef = voornaam ? `Beste ${voornaam},` : "Beste heer/mevrouw,";
 
   const extras: string[] = [];
-  if (parsed.wantsQuote) extras.push("we werken een prijsopgave voor je uit");
-  if (parsed.wantsProofDesign) extras.push("we kunnen een proefdesign opstellen");
+  if (parsed.wantsQuote) extras.push("Wij werken graag een prijsopgave voor u uit");
+  if (parsed.wantsProofDesign) extras.push("wij kunnen een proefdesign voor u opstellen");
 
-  return `Beste ${naam},\n\nBedankt voor je aanvraag${
-    parsed.theme ? ` over ${parsed.theme.toLowerCase()}` : ""
-  }. ${extras.length > 0 ? extras.join(" en ") + "." : ""}\n\n${tone}\n\nMet vriendelijke groet,\nChampagne is Art Studio`;
+  const thema = parsed.theme ? ` over ${parsed.theme.toLowerCase()}` : "";
+  const vervolg =
+    extras.length > 0
+      ? `${extras.join(" en ")}.`
+      : "Wij nemen zo spoedig mogelijk contact met u op.";
+
+  return `${aanhef}
+
+Hartelijk dank voor uw aanvraag${thema}. Wij hebben uw bericht in goede orde ontvangen. ${vervolg}
+
+Met vriendelijke groet,
+Champagne is Art Studio`;
 }
 
 export async function checkMissingOrderInfo(order: {

@@ -257,6 +257,7 @@ export const messageDrafts = pgTable("message_drafts", {
   id: serial("id").primaryKey(),
   messageId: integer("message_id").references(() => messages.id),
   body: text("body").notNull(),
+  internalNotes: text("internal_notes"),
   approved: boolean("approved").notNull().default(false),
   createdAt: text("created_at").notNull().default(ts),
 });

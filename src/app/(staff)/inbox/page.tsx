@@ -1,7 +1,8 @@
 import { desc, eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { messageDrafts, messages } from "@/db/schema";
-import { createInboundMessage, approveDraft } from "@/lib/actions/inbox";
+import { createInboundMessage } from "@/lib/actions/inbox";
+import { MailDraftPanel } from "@/components/inbox/mail-draft-panel";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -56,23 +57,12 @@ export default async function InboxPage() {
             <CardContent className="space-y-3 text-sm">
               <p className="whitespace-pre-wrap text-foreground">{message.body}</p>
               {draft && (
-                <div className="rounded-md bg-gold/10 p-3">
-                  <p className="mb-2 font-medium text-gold-bright">AI-concept</p>
-                  <pre className="whitespace-pre-wrap font-sans text-foreground">{draft.body}</pre>
-                  {!draft.approved && (
-                    <form
-                      action={async () => {
-                        "use server";
-                        await approveDraft(draft.id);
-                      }}
-                      className="mt-2"
-                    >
-                      <Button type="submit" variant="secondary" className="w-full sm:w-auto">
-                        Concept goedkeuren (kopiëren)
-                      </Button>
-                    </form>
-                  )}
-                </div>
+                <MailDraftPanel
+                  emailBody={draft.body}
+                  internalNotes={draft.internalNotes}
+                  approved={draft.approved}
+                  draftId={draft.id}
+                />
               )}
             </CardContent>
           </Card>

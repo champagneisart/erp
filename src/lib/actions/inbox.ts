@@ -3,52 +3,40 @@
 import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
-import { messages, messageDrafts } from "@/db/schema";
+import { messageDrafts } from "@/db/schema";
 import { auth } from "@/lib/auth";
 import { assertStaff } from "@/lib/auth/permissions";
-import {
-  classifyIncomingMessage,
-  generateCustomerReply,
-} from "@/lib/ai";
+import { createInboxEntryWithDraft, regenerateLeadMailDraft } from "@/lib/ai/inbox-draft";
 
 export async function createInboundMessage(data: {
   body: string;
   subject?: string;
   channel?: string;
   customerId?: number;
+  customerName?: string;
+  customerEmail?: string;
   leadId?: number;
+  leadTitle?: string;
   orderId?: number;
 }) {
   const session = await auth();
   assertStaff(session);
 
-  const classification = await classifyIncomingMessage(data.body);
-
-  const [msg] = await db
-    .insert(messages)
-    .values({
-      body: data.body,
-      subject: data.subject ?? null,
-      channel: data.channel ?? "manual",
-      customerId: data.customerId ?? null,
-      leadId: data.leadId ?? null,
-      orderId: data.orderId ?? null,
-      classification: classification.type,
-    })
-    .returning();
-
-  const draftBody = await generateCustomerReply({
-    messageBody: data.body,
-    classification: classification.type,
-  });
-
-  await db.insert(messageDrafts).values({
-    messageId: msg.id,
-    body: draftBody,
+  const msg = await createInboxEntryWithDraft({
+    body: data.body,
+    subject: data.subject,
+    channel: data.channel ?? "manual",
+    customerId: data.customerId,
+    customerName: data.customerName,
+    customerEmail: data.customerEmail,
+    leadId: data.leadId,
+    leadTitle: data.leadTitle,
+    orderId: data.orderId,
   });
 
   revalidatePath("/inbox");
-  return { message: msg, classification, draftBody };
+  revalidatePath("/leads");
+  return { message: msg };
 }
 
 export async function approveDraft(draftId: number) {
@@ -61,4 +49,22 @@ export async function approveDraft(draftId: number) {
     .where(eq(messageDrafts.id, draftId));
 
   revalidatePath("/inbox");
+  revalidatePath("/leads");
+}
+
+export async function regenerateMailDraftForLead(
+  leadId: number,
+  context: {
+    customerName?: string;
+    customerEmail?: string;
+    leadTitle?: string;
+  }
+) {
+  const session = await auth();
+  assertStaff(session);
+
+  await regenerateLeadMailDraft(leadId, context);
+
+  revalidatePath("/inbox");
+  revalidatePath(`/leads/${leadId}`);
 }

@@ -4,20 +4,14 @@ import { db } from "@/lib/db";
 import {
   customers,
   leads,
-  messages,
-  messageDrafts,
   orders,
   tasks,
   workInstructions,
 } from "@/db/schema";
 import { logActivity } from "@/lib/actions/log";
-import {
-  classifyIncomingMessage,
-  generateCustomerReply,
-  type MessageClassification,
-} from "@/lib/ai";
 import type { NormalizedFormData } from "@/lib/webhooks/parse-form-payload";
 import { buildLeadDescription, formatAanvraagTitle } from "@/lib/webhooks/form-display";
+import { createInboxEntryWithDraft } from "@/lib/ai/inbox-draft";
 
 function revalidateWebhookPages() {
   revalidatePath("/leads");
@@ -83,52 +77,6 @@ async function resolveOrder(data: Pick<NormalizedFormData, "orderNumber" | "emai
   }
 
   return null;
-}
-
-async function createInboxEntry(params: {
-  body: string;
-  subject?: string;
-  channel: string;
-  customerId?: number;
-  leadId?: number;
-  orderId?: number;
-}) {
-  let classification: { type: MessageClassification; confidence?: number } = {
-    type: "unknown",
-  };
-  let draftBody: string | null = null;
-
-  try {
-    classification = await classifyIncomingMessage(params.body);
-    draftBody = await generateCustomerReply({
-      messageBody: params.body,
-      classification: classification.type,
-    });
-  } catch {
-    // AI optioneel — inbox werkt ook zonder OpenAI
-  }
-
-  const [msg] = await db
-    .insert(messages)
-    .values({
-      body: params.body,
-      subject: params.subject ?? null,
-      channel: params.channel,
-      customerId: params.customerId ?? null,
-      leadId: params.leadId ?? null,
-      orderId: params.orderId ?? null,
-      classification: classification.type,
-    })
-    .returning();
-
-  if (draftBody) {
-    await db.insert(messageDrafts).values({
-      messageId: msg.id,
-      body: draftBody,
-    });
-  }
-
-  return msg;
 }
 
 function buildRawPayload(data: NormalizedFormData) {
@@ -210,12 +158,15 @@ export async function processContactForm(data: NormalizedFormData) {
     })
     .returning();
 
-  const msg = await createInboxEntry({
+  const msg = await createInboxEntryWithDraft({
     body: buildLeadDescription(data),
     subject: data.subject ?? "Contactformulier website",
     channel: "website_contact",
     customerId: customer.id,
+    customerName: customer.name,
+    customerEmail: customer.email ?? data.email,
     leadId: lead.id,
+    leadTitle: lead.title ?? undefined,
   });
 
   await logActivity({
@@ -252,19 +203,22 @@ export async function processAanvraagForm(data: NormalizedFormData) {
     .returning();
 
   await db.insert(tasks).values({
-    title: "Nieuwe website-aanvraag beoordelen",
-    description: `${customer.name}${data.email ? ` (${data.email})` : ""} — ${lead.title}`,
+    title: "Mailopzet beoordelen — nieuwe aanvraag",
+    description: `${customer.name}${data.email ? ` (${data.email})` : ""} — ${lead.title}. Klantcontact Agent heeft een concept klaargezet.`,
     leadId: lead.id,
     priority: "high",
     isAutomatic: true,
   });
 
-  await createInboxEntry({
+  await createInboxEntryWithDraft({
     body: buildLeadDescription(data),
-    subject: data.title ?? "Aanvraag via website",
+    subject: data.title ?? lead.title ?? "Aanvraag via website",
     channel: "website_aanvraag",
     customerId: customer.id,
+    customerName: customer.name,
+    customerEmail: customer.email ?? data.email,
     leadId: lead.id,
+    leadTitle: lead.title ?? undefined,
   });
 
   await logActivity({
@@ -366,12 +320,15 @@ export async function processOntwerpdetailsForm(data: NormalizedFormData) {
     isAutomatic: true,
   });
 
-  await createInboxEntry({
+  await createInboxEntryWithDraft({
     body: buildLeadDescription(data),
     subject: "Ontwerpdetails via website",
     channel: "website_ontwerpdetails",
     customerId: customer?.id,
+    customerName: customer?.name ?? data.name,
+    customerEmail: customer?.email ?? data.email,
     leadId: leadId ?? undefined,
+    leadTitle: data.title ?? undefined,
   });
 
   revalidateWebhookPages();

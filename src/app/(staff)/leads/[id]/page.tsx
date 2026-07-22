@@ -15,6 +15,8 @@ import {
   type LeadStatus,
 } from "@/lib/constants/statuses";
 import { parseLeadDisplaySections } from "@/lib/webhooks/form-display";
+import { getLeadMailDraft } from "@/lib/ai/inbox-draft";
+import { MailDraftPanel } from "@/components/inbox/mail-draft-panel";
 import { LeadEditSection } from "@/components/leads/lead-edit-form";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -45,6 +47,7 @@ export default async function LeadDetailPage({
     .limit(1);
 
   const sections = parseLeadDisplaySections(lead.rawPayload, lead.description);
+  const mailDraft = await getLeadMailDraft(leadId);
 
   async function saveLead(formData: FormData) {
     "use server";
@@ -121,6 +124,28 @@ export default async function LeadDetailPage({
           </CardContent>
         </Card>
       ) : null}
+
+      {mailDraft?.draft && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Antwoord aan klant</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <MailDraftPanel
+              emailBody={mailDraft.draft.body}
+              internalNotes={mailDraft.draft.internalNotes}
+              approved={mailDraft.draft.approved}
+              draftId={mailDraft.draft.id}
+              leadId={leadId}
+              regenerateContext={{
+                customerName: customer?.name ?? undefined,
+                customerEmail: customer?.email ?? undefined,
+                leadTitle: lead.title ?? undefined,
+              }}
+            />
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardHeader>
