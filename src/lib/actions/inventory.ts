@@ -1,7 +1,7 @@
 "use server";
 
 import { and, eq, sql } from "drizzle-orm";
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { db } from "@/lib/db";
 import {
   inventory,
@@ -15,6 +15,10 @@ import {
 import { auth } from "@/lib/auth";
 import { assertStaff } from "@/lib/auth/permissions";
 import type { ShipmentStatus } from "@/lib/constants/inventory";
+import {
+  getCachedLocations,
+  getCachedProducts,
+} from "@/lib/cache/inventory";
 
 async function getStockRow(productId: number, locationId: number) {
   const [row] = await db
@@ -74,12 +78,8 @@ export async function getAllLocations() {
 }
 
 export async function getLocationBySlug(slug: string) {
-  const [loc] = await db
-    .select()
-    .from(inventoryLocations)
-    .where(eq(inventoryLocations.slug, slug))
-    .limit(1);
-  return loc ?? null;
+  const locations = await getCachedLocations();
+  return locations.find((l) => l.slug === slug) ?? null;
 }
 
 export async function getOfficeLocation() {
@@ -103,7 +103,18 @@ export async function getArtistLocation(artistUserId: number) {
 }
 
 export async function getAllProducts() {
-  return db.select().from(products).orderBy(products.brand, products.name);
+  return getCachedProducts();
+}
+
+/** Alle inventory-pagedata in één parallelle batch (sneller dan losse awaits) */
+export async function getInventoryPageData() {
+  const [products, rows, shipments, locations] = await Promise.all([
+    getCachedProducts(),
+    getInventoryOverview(),
+    getIncomingShipments(),
+    getCachedLocations(),
+  ]);
+  return { products, rows, shipments, locations };
 }
 
 export async function createProduct(data: {
@@ -154,6 +165,7 @@ export async function createProduct(data: {
   }
 
   revalidatePath("/inventory");
+  revalidateTag("inventory-products", "max");
   return product;
 }
 
@@ -538,7 +550,7 @@ export async function updateShipmentStatus(id: number, status: ShipmentStatus) {
 }
 
 /** Logboek voor één locatie (kantoor of kunstenaar) */
-export async function getLocationLogbook(locationId: number, limit = 100) {
+export async function getLocationLogbook(locationId: number, limit = 50) {
   const rows = await db
     .select({
       movement: inventoryMovements,
@@ -556,8 +568,9 @@ export async function getLocationLogbook(locationId: number, limit = 100) {
     .orderBy(sql`${inventoryMovements.createdAt} DESC`)
     .limit(limit);
 
-  const allLocs = await db.select().from(inventoryLocations);
-  const locMap = new Map(allLocs.map((l) => [l.id, l.name]));
+  const locMap = new Map(
+    (await getCachedLocations()).map((l) => [l.id, l.name])
+  );
 
   return rows.map((row) => ({
     ...row,

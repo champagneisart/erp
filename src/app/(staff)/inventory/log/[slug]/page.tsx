@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getLocationBySlug, getLocationLogbook } from "@/lib/actions/inventory";
+import { getCachedLocations } from "@/lib/cache/inventory";
+import { getLocationLogbook } from "@/lib/actions/inventory";
 import { MOVEMENT_TYPE_LABELS } from "@/lib/constants/inventory";
 import { formatDateTime } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -49,7 +50,8 @@ export default async function InventoryLogPage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const location = await getLocationBySlug(slug);
+  const locations = await getCachedLocations();
+  const location = locations.find((l) => l.slug === slug);
   if (!location) notFound();
 
   const entries = await getLocationLogbook(location.id);

@@ -1,12 +1,8 @@
 import Link from "next/link";
-import { db } from "@/lib/db";
-import { inventoryLocations } from "@/db/schema";
 import {
   addBottles,
   createProduct,
-  getAllProducts,
-  getIncomingShipments,
-  getInventoryOverview,
+  getInventoryPageData,
   markShipmentReceived,
   registerIncomingShipment,
   transferStock,
@@ -22,10 +18,7 @@ function formatEuro(value: string | null) {
 }
 
 export default async function InventoryPage() {
-  const products = await getAllProducts();
-  const rows = await getInventoryOverview();
-  const shipments = await getIncomingShipments();
-  const locations = await db.select().from(inventoryLocations);
+  const { products, rows, shipments, locations } = await getInventoryPageData();
 
   const office = locations.find((l) => l.slug === "office");
   const artistLocations = locations.filter((l) => l.locationType === "artist");
