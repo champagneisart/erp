@@ -1,6 +1,7 @@
 import { eq } from "drizzle-orm";
 import { appSettings } from "@/db/schema";
 import { db } from "@/lib/db";
+import { getOpenAiChatModel, getOpenAiKey } from "@/lib/ai/config";
 
 type HealthTrigger = "manual" | "cron" | "system";
 
@@ -14,14 +15,7 @@ export type OpenAiHealthCheckResult = {
 };
 
 async function getOpenAiApiKey(): Promise<string | null> {
-  if (process.env.OPENAI_API_KEY) return process.env.OPENAI_API_KEY;
-
-  const [row] = await db
-    .select()
-    .from(appSettings)
-    .where(eq(appSettings.key, "openai_api_key"))
-    .limit(1);
-  return row?.value ?? null;
+  return getOpenAiKey();
 }
 
 async function setSetting(key: string, value: string) {
@@ -67,6 +61,7 @@ export async function performOpenAiHealthCheck(
 
   const startedAt = Date.now();
   try {
+    const model = await getOpenAiChatModel();
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -74,7 +69,7 @@ export async function performOpenAiHealthCheck(
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "gpt-4o-mini",
+        model,
         temperature: 0,
         max_tokens: 5,
         messages: [{ role: "user", content: "reply with OK" }],

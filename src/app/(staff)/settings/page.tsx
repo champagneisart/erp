@@ -20,6 +20,13 @@ import { getWebhookCaptures, isWebhookProcessingEnabled } from "@/lib/webhooks/c
 import { resolveAvadaFormTypeDetailed } from "@/lib/webhooks/avada-forms";
 import { processStoredWebhookCaptures } from "@/lib/actions/webhooks";
 import { eq } from "drizzle-orm";
+import {
+  OPENAI_CHAT_MODELS,
+  OPENAI_EMBEDDING_MODELS,
+  getOpenAiChatModel,
+  getOpenAiEmbeddingModel,
+  isOpenAiKeyFromEnv,
+} from "@/lib/ai/config";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
@@ -35,6 +42,19 @@ export default async function SettingsPage() {
     .from(appSettings)
     .where(eq(appSettings.key, "openai_api_key"))
     .limit(1);
+  const [chatModelSetting] = await db
+    .select()
+    .from(appSettings)
+    .where(eq(appSettings.key, "openai_chat_model"))
+    .limit(1);
+  const [embeddingModelSetting] = await db
+    .select()
+    .from(appSettings)
+    .where(eq(appSettings.key, "openai_embedding_model"))
+    .limit(1);
+  const activeChatModel = await getOpenAiChatModel();
+  const activeEmbeddingModel = await getOpenAiEmbeddingModel();
+  const keyFromEnv = isOpenAiKeyFromEnv();
   const [workbonUrl] = await db
     .select()
     .from(appSettings)
@@ -286,10 +306,19 @@ export default async function SettingsPage() {
           <CardHeader>
             <CardTitle>OpenAI koppeling</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-3">
+          <CardContent className="space-y-4">
             <p className="text-sm text-muted">
-              Voeg een API key toe om AI-extractie en agentgedrag te activeren in leads/inbox.
+              API-key in Vercel als{" "}
+              <code className="text-foreground">OPENAI_API_KEY</code> heeft voorrang op het
+              veld hieronder. Chat-agents gebruiken het <strong className="font-normal text-foreground">chatmodel</strong>;
+              embedding-modellen zijn voor toekomstige zoek/RAG (zoals in chatbot-tools).
             </p>
+            {keyFromEnv && (
+              <p className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-300">
+                API-key komt uit omgevingsvariabele (Vercel). Het wachtwoordveld hieronder is
+                optioneel/backup.
+              </p>
+            )}
             <form
               action={async (fd) => {
                 "use server";
@@ -304,9 +333,70 @@ export default async function SettingsPage() {
                 name="openai_api_key"
                 type="password"
                 defaultValue={openAiSetting?.value ?? ""}
-                placeholder="sk-..."
+                placeholder="sk-... (of leeg als OPENAI_API_KEY in Vercel staat)"
+                disabled={keyFromEnv}
               />
-              <Button type="submit">Opslaan</Button>
+              <Button type="submit" variant="outline" disabled={keyFromEnv}>
+                Key opslaan
+              </Button>
+            </form>
+            <form
+              action={async (fd) => {
+                "use server";
+                await upsertSetting(
+                  "openai_chat_model",
+                  (fd.get("openai_chat_model") as string) ?? "gpt-4o-mini"
+                );
+                await upsertSetting(
+                  "openai_embedding_model",
+                  (fd.get("openai_embedding_model") as string) ??
+                    "text-embedding-3-small"
+                );
+              }}
+              className="form-stack border-t border-gold/10 pt-4"
+            >
+              <p className="text-sm font-medium">Modellen</p>
+              <div className="grid min-w-0 gap-3 md:grid-cols-2">
+                <div>
+                  <label className="mb-1 block text-xs text-muted">
+                    Chatmodel (agents, extractie, inbox)
+                  </label>
+                  <Select
+                    name="openai_chat_model"
+                    defaultValue={chatModelSetting?.value ?? activeChatModel}
+                  >
+                    {OPENAI_CHAT_MODELS.map((m) => (
+                      <option key={m.id} value={m.id}>
+                        {m.label}
+                      </option>
+                    ))}
+                  </Select>
+                  <p className="mt-1 text-xs text-muted">
+                    Actief: {activeChatModel}
+                    {process.env.OPENAI_MODEL ? " (via env OPENAI_MODEL)" : ""}
+                  </p>
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs text-muted">
+                    Embeddingmodel (kennisbank-zoek, nog niet live)
+                  </label>
+                  <Select
+                    name="openai_embedding_model"
+                    defaultValue={embeddingModelSetting?.value ?? activeEmbeddingModel}
+                  >
+                    {OPENAI_EMBEDDING_MODELS.map((m) => (
+                      <option key={m.id} value={m.id}>
+                        {m.label}
+                      </option>
+                    ))}
+                  </Select>
+                  <p className="mt-1 text-xs text-muted">
+                    Zoals text-embedding-3-small in chatbot-software — wordt opgeslagen voor
+                    latere RAG; nu injecteren we tekst direct in prompts.
+                  </p>
+                </div>
+              </div>
+              <Button type="submit">Modellen opslaan</Button>
             </form>
           </CardContent>
         </Card>

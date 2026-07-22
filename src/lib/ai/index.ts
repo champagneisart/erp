@@ -2,6 +2,7 @@ import { eq, like, or } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { appSettings, kbArticles } from "@/db/schema";
 import { parseInquiryText, parsedToLeadFields } from "@/lib/ai/parse-inquiry";
+import { getOpenAiChatModel, getOpenAiKey } from "@/lib/ai/config";
 
 export type MessageClassification =
   | "new_lead"
@@ -42,16 +43,6 @@ const KEYWORDS: Record<MessageClassification, string[]> = {
   unknown: [],
 };
 
-async function getOpenAiKey(): Promise<string | null> {
-  if (process.env.OPENAI_API_KEY) return process.env.OPENAI_API_KEY;
-  const [setting] = await db
-    .select()
-    .from(appSettings)
-    .where(eq(appSettings.key, "openai_api_key"))
-    .limit(1);
-  return setting?.value ?? null;
-}
-
 async function callOpenAi(
   systemPrompt: string,
   userPrompt: string,
@@ -60,6 +51,8 @@ async function callOpenAi(
   const apiKey = await getOpenAiKey();
   if (!apiKey) return null;
 
+  const model = await getOpenAiChatModel();
+
   const response = await fetch("https://api.openai.com/v1/chat/completions", {
     method: "POST",
     headers: {
@@ -67,7 +60,7 @@ async function callOpenAi(
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      model: "gpt-4o-mini",
+      model,
       temperature: 0.05,
       max_tokens: options?.maxTokens ?? 900,
       ...(options?.json ? { response_format: { type: "json_object" } } : {}),
