@@ -4,7 +4,7 @@ import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
-import { customers, leads, orders, tasks } from "@/db/schema";
+import { customers, leads, messages, orders, tasks, agentChatSessions } from "@/db/schema";
 import { auth } from "@/lib/auth";
 import { assertStaff } from "@/lib/auth/permissions";
 import {
@@ -176,6 +176,13 @@ export async function deleteLead(id: number) {
   if (order) {
     throw new Error("Kan aanvraag niet verwijderen: er is al een order gekoppeld");
   }
+
+  await db.delete(tasks).where(eq(tasks.leadId, id));
+  await db.update(messages).set({ leadId: null }).where(eq(messages.leadId, id));
+  await db
+    .update(agentChatSessions)
+    .set({ leadId: null })
+    .where(eq(agentChatSessions.leadId, id));
 
   await db.delete(leads).where(eq(leads.id, id));
   revalidatePath("/leads");
