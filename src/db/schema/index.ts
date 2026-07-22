@@ -203,10 +203,11 @@ export const inventoryMovements = pgTable("inventory_movements", {
   orderId: integer("order_id").references(() => orders.id),
   supplierOrderId: integer("supplier_order_id").references(() => supplierOrders.id),
   movementType: text("movement_type", {
-    enum: ["reserve", "release", "consume", "adjust", "transfer", "receive"],
+    enum: ["reserve", "release", "consume", "adjust", "transfer", "receive", "add"],
   }).notNull(),
   quantity: integer("quantity").notNull(),
   note: text("note"),
+  userId: integer("user_id").references(() => users.id),
   createdAt: text("created_at").notNull().default(ts),
 });
 

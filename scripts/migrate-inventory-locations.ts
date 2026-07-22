@@ -55,9 +55,39 @@ async function main() {
 
   const artistLocations = [];
   for (const artist of artists) {
+    if (artist.name !== "Darrin" && artist.email === "artist@champagneisart.nl") {
+      await db
+        .update(schema.users)
+        .set({ name: "Darrin" })
+        .where(eq(schema.users.id, artist.id));
+      artist.name = "Darrin";
+      console.log("Kunstenaar hernoemd naar Darrin");
+    }
+
+    const displayName =
+      artist.name.toLowerCase() === "darrin"
+        ? "Kunstenaar Darrin"
+        : `Kunstenaar ${artist.name}`;
+
+    const [existing] = await db
+      .select()
+      .from(schema.inventoryLocations)
+      .where(eq(schema.inventoryLocations.artistUserId, artist.id))
+      .limit(1);
+
+    if (existing) {
+      await db
+        .update(schema.inventoryLocations)
+        .set({ name: displayName })
+        .where(eq(schema.inventoryLocations.id, existing.id));
+      artistLocations.push({ ...existing, name: displayName });
+      console.log(`Locatie bijgewerkt: ${displayName}`);
+      continue;
+    }
+
     const loc = await ensureLocation({
       slug: `artist-${artist.id}`,
-      name: `Bij ${artist.name}`,
+      name: displayName,
       locationType: "artist",
       artistUserId: artist.id,
     });

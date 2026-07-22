@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import Link from "next/link";
 import { db } from "@/lib/db";
 import { inventoryLocations } from "@/db/schema";
 import {
@@ -9,6 +9,7 @@ import {
   getInventoryOverview,
   markShipmentReceived,
   registerIncomingShipment,
+  transferStock,
 } from "@/lib/actions/inventory";
 import { BOTTLE_FORMATS } from "@/lib/constants/inventory";
 import { Button } from "@/components/ui/button";
@@ -27,10 +28,9 @@ export default async function InventoryPage() {
   const locations = await db.select().from(inventoryLocations);
 
   const office = locations.find((l) => l.slug === "office");
-  const artist = locations.find((l) => l.locationType === "artist");
+  const artistLocations = locations.filter((l) => l.locationType === "artist");
 
   const officeStock = rows.filter((r) => r.location.slug === "office");
-  const artistStock = rows.filter((r) => r.location.locationType === "artist");
 
   return (
     <div className="space-y-8">
@@ -111,8 +111,16 @@ export default async function InventoryPage() {
       {/* Voorraad overzicht */}
       <div className="grid gap-6 md:grid-cols-2">
         <Card>
-          <CardHeader>
+          <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle>Kantoor</CardTitle>
+            {office && (
+              <Link
+                href={`/inventory/log/${office.slug}`}
+                className="text-xs text-muted hover:text-gold-bright"
+              >
+                Logboek →
+              </Link>
+            )}
           </CardHeader>
           <CardContent>
             <ul className="space-y-1 text-sm">
@@ -132,31 +140,98 @@ export default async function InventoryPage() {
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Bij kunstenaar</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ul className="space-y-1 text-sm">
-              {artistStock.length === 0 && (
-                <li className="text-muted">Nog geen voorraad</li>
-              )}
-              {artistStock.map(({ product, inv }) => (
-                <li key={product.id} className="flex justify-between">
-                  <span>
-                    {product.brand ? `${product.brand} — ` : ""}
-                    {product.name}
-                  </span>
-                  <span className="font-medium">{inv.quantity}x</span>
-                </li>
-              ))}
-            </ul>
-          </CardContent>
-        </Card>
+        {artistLocations.map((artistLoc) => {
+          const stock = rows.filter((r) => r.location.id === artistLoc.id);
+          return (
+            <Card key={artistLoc.id}>
+              <CardHeader className="flex flex-row items-center justify-between">
+                <CardTitle>{artistLoc.name}</CardTitle>
+                <Link
+                  href={`/inventory/log/${artistLoc.slug}`}
+                  className="text-xs text-muted hover:text-gold-bright"
+                >
+                  Logboek →
+                </Link>
+              </CardHeader>
+              <CardContent>
+                <ul className="space-y-1 text-sm">
+                  {stock.length === 0 && (
+                    <li className="text-muted">Nog geen voorraad</li>
+                  )}
+                  {stock.map(({ product, inv }) => (
+                    <li key={product.id} className="flex justify-between">
+                      <span>
+                        {product.brand ? `${product.brand} — ` : ""}
+                        {product.name}
+                      </span>
+                      <span className="font-medium">{inv.quantity}x</span>
+                    </li>
+                  ))}
+                </ul>
+              </CardContent>
+            </Card>
+          );
+        })}
       </div>
 
+      {/* Transfer kantoor → kunstenaar */}
+      {office && artistLocations.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Flessen brengen naar kunstenaar</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="mb-4 text-sm text-muted">
+              Verplaats voorraad van kantoor naar kunstenaar. Wordt gelogd in beide logboeken.
+            </p>
+            <form
+              action={async (fd) => {
+                "use server";
+                await transferStock({
+                  productId: Number(fd.get("productId")),
+                  fromLocationId: office!.id,
+                  toLocationId: Number(fd.get("toLocationId")),
+                  quantity: Number(fd.get("quantity")),
+                  note: (fd.get("note") as string) || undefined,
+                });
+              }}
+              className="grid max-w-lg gap-3"
+            >
+              <select
+                name="productId"
+                required
+                className="h-10 rounded-md border border-border bg-background px-3 text-sm"
+              >
+                <option value="">Welke fles?</option>
+                {products.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.brand ? `${p.brand} — ` : ""}
+                    {p.name} {p.format ? `(${p.format})` : ""}
+                  </option>
+                ))}
+              </select>
+              <select
+                name="toLocationId"
+                required
+                className="h-10 rounded-md border border-border bg-background px-3 text-sm"
+              >
+                <option value="">Naar welke kunstenaar?</option>
+                {artistLocations.map((loc) => (
+                  <option key={loc.id} value={loc.id}>
+                    {loc.name}
+                  </option>
+                ))}
+              </select>
+              <Input name="quantity" type="number" min={1} placeholder="Aantal" required />
+              <Input name="note" placeholder="Notitie (optioneel)" />
+              <Button type="submit">Verplaatsen</Button>
+            </form>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Flessen bijboeken */}
-      {office && artist && (
+      {office && artistLocations.length > 0 && (
         <Card>
           <CardHeader>
             <CardTitle>Flessen bijboeken</CardTitle>
@@ -197,7 +272,11 @@ export default async function InventoryPage() {
               >
                 <option value="">Waar?</option>
                 <option value={office.id}>Kantoor</option>
-                <option value={artist.id}>Bij kunstenaar</option>
+                {artistLocations.map((loc) => (
+                  <option key={loc.id} value={loc.id}>
+                    {loc.name}
+                  </option>
+                ))}
               </select>
               <Input name="quantity" type="number" min={1} placeholder="Aantal" required />
               <Input name="note" placeholder="Notitie (optioneel)" />
@@ -213,7 +292,7 @@ export default async function InventoryPage() {
           <CardTitle>Onderweg (besteld, nog niet ontvangen)</CardTitle>
         </CardHeader>
         <CardContent className="space-y-6">
-          {office && artist && (
+          {office && artistLocations.length > 0 && (
             <form
               action={async (fd) => {
                 "use server";
@@ -249,7 +328,11 @@ export default async function InventoryPage() {
               >
                 <option value="">Bestemming</option>
                 <option value={office.id}>Kantoor</option>
-                <option value={artist.id}>Kunstenaar</option>
+                {artistLocations.map((loc) => (
+                  <option key={loc.id} value={loc.id}>
+                    {loc.name}
+                  </option>
+                ))}
               </select>
               <Input name="supplierName" placeholder="Leverancier" />
               <Input name="orderReference" placeholder="Ordernummer webshop" />

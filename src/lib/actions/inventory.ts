@@ -10,6 +10,7 @@ import {
   products,
   supplierOrders,
   tasks,
+  users,
 } from "@/db/schema";
 import { auth } from "@/lib/auth";
 import { assertStaff } from "@/lib/auth/permissions";
@@ -37,6 +38,48 @@ async function ensureStockRow(productId: number, locationId: number) {
     .values({ productId, locationId, quantity: 0, reserved: 0, minimum: 0 })
     .returning();
   return row;
+}
+
+async function recordMovement(data: {
+  productId: number;
+  quantity: number;
+  movementType: "add" | "receive" | "transfer" | "consume" | "adjust";
+  locationId?: number;
+  locationFromId?: number;
+  locationToId?: number;
+  orderId?: number;
+  supplierOrderId?: number;
+  note?: string;
+  userId?: number;
+}) {
+  await db.insert(inventoryMovements).values({
+    productId: data.productId,
+    locationId: data.locationId ?? null,
+    locationFromId: data.locationFromId ?? null,
+    locationToId: data.locationToId ?? null,
+    orderId: data.orderId ?? null,
+    supplierOrderId: data.supplierOrderId ?? null,
+    movementType: data.movementType,
+    quantity: data.quantity,
+    note: data.note ?? null,
+    userId: data.userId ?? null,
+  });
+}
+
+export async function getAllLocations() {
+  return db
+    .select()
+    .from(inventoryLocations)
+    .orderBy(inventoryLocations.locationType, inventoryLocations.name);
+}
+
+export async function getLocationBySlug(slug: string) {
+  const [loc] = await db
+    .select()
+    .from(inventoryLocations)
+    .where(eq(inventoryLocations.slug, slug))
+    .limit(1);
+  return loc ?? null;
 }
 
 export async function getOfficeLocation() {
@@ -143,6 +186,7 @@ export async function addBottles(data: {
   assertStaff(session);
   if (data.quantity <= 0) throw new Error("Aantal moet groter dan 0 zijn");
 
+  const userId = Number(session!.user!.id);
   const row = await ensureStockRow(data.productId, data.locationId);
   await db
     .update(inventory)
@@ -157,15 +201,105 @@ export async function addBottles(data: {
       )
     );
 
-  await db.insert(inventoryMovements).values({
+  await recordMovement({
     productId: data.productId,
     locationId: data.locationId,
-    movementType: "adjust",
+    movementType: "add",
     quantity: data.quantity,
-    note: data.note ?? "Flessen bijgeboekt",
+    note: data.note ?? "Handmatig bijgeboekt",
+    userId,
   });
 
   revalidatePath("/inventory");
+  revalidatePath(`/inventory/log/${await locationSlug(data.locationId)}`);
+}
+
+/** Verplaats voorraad van kantoor naar kunstenaar (of andere locatie) */
+export async function transferStock(data: {
+  productId: number;
+  fromLocationId: number;
+  toLocationId: number;
+  quantity: number;
+  note?: string;
+}) {
+  const session = await auth();
+  assertStaff(session);
+  if (data.quantity <= 0) throw new Error("Aantal moet groter dan 0 zijn");
+  if (data.fromLocationId === data.toLocationId) {
+    throw new Error("Bron en bestemming moeten verschillen");
+  }
+
+  const userId = Number(session!.user!.id);
+  const from = await getStockRow(data.productId, data.fromLocationId);
+  if (!from || from.quantity < data.quantity) {
+    throw new Error("Onvoldoende voorraad op bronlocatie");
+  }
+
+  await ensureStockRow(data.productId, data.toLocationId);
+  const to = await getStockRow(data.productId, data.toLocationId);
+
+  await db
+    .update(inventory)
+    .set({
+      quantity: from.quantity - data.quantity,
+      updatedAt: new Date().toISOString(),
+    })
+    .where(
+      and(
+        eq(inventory.productId, data.productId),
+        eq(inventory.locationId, data.fromLocationId)
+      )
+    );
+
+  await db
+    .update(inventory)
+    .set({
+      quantity: (to?.quantity ?? 0) + data.quantity,
+      updatedAt: new Date().toISOString(),
+    })
+    .where(
+      and(
+        eq(inventory.productId, data.productId),
+        eq(inventory.locationId, data.toLocationId)
+      )
+    );
+
+  const [fromLoc] = await db
+    .select()
+    .from(inventoryLocations)
+    .where(eq(inventoryLocations.id, data.fromLocationId))
+    .limit(1);
+  const [toLoc] = await db
+    .select()
+    .from(inventoryLocations)
+    .where(eq(inventoryLocations.id, data.toLocationId))
+    .limit(1);
+
+  await recordMovement({
+    productId: data.productId,
+    locationFromId: data.fromLocationId,
+    locationToId: data.toLocationId,
+    locationId: data.toLocationId,
+    movementType: "transfer",
+    quantity: data.quantity,
+    note:
+      data.note ??
+      `Van ${fromLoc?.name ?? "bron"} naar ${toLoc?.name ?? "bestemming"}`,
+    userId,
+  });
+
+  revalidatePath("/inventory");
+  revalidatePath(`/inventory/log/${fromLoc?.slug ?? ""}`);
+  revalidatePath(`/inventory/log/${toLoc?.slug ?? ""}`);
+}
+
+async function locationSlug(locationId: number) {
+  const [loc] = await db
+    .select()
+    .from(inventoryLocations)
+    .where(eq(inventoryLocations.id, locationId))
+    .limit(1);
+  return loc?.slug ?? "office";
 }
 
 /** Online bestelling registreren — onderweg naar kantoor of kunstenaar */
@@ -214,11 +348,32 @@ export async function markShipmentReceived(id: number) {
 
   const toReceive = shipment.quantityOrdered - shipment.quantityReceived;
   if (toReceive > 0) {
-    await addBottles({
+    const userId = Number(session!.user!.id);
+    const row = await ensureStockRow(
+      shipment.productId,
+      shipment.destinationLocationId
+    );
+    await db
+      .update(inventory)
+      .set({
+        quantity: row.quantity + toReceive,
+        updatedAt: new Date().toISOString(),
+      })
+      .where(
+        and(
+          eq(inventory.productId, shipment.productId),
+          eq(inventory.locationId, shipment.destinationLocationId)
+        )
+      );
+
+    await recordMovement({
       productId: shipment.productId,
       locationId: shipment.destinationLocationId,
+      supplierOrderId: id,
+      movementType: "receive",
       quantity: toReceive,
-      note: `Ontvangen: bestelling #${id}`,
+      note: `Levering ontvangen (bestelling #${id})`,
+      userId,
     });
   }
 
@@ -310,13 +465,13 @@ export async function deductForOrder(
       )
     );
 
-  await db.insert(inventoryMovements).values({
+  await recordMovement({
     productId,
     locationId: location.id,
     orderId,
     movementType: "consume",
     quantity,
-    note: "Afgeboekt voor order",
+    note: `Afgeboekt voor order #${orderId}`,
   });
 
   revalidatePath("/inventory");
@@ -380,4 +535,37 @@ export async function updateShipmentStatus(id: number, status: ShipmentStatus) {
     .set({ status, updatedAt: new Date().toISOString() })
     .where(eq(supplierOrders.id, id));
   revalidatePath("/inventory");
+}
+
+/** Logboek voor één locatie (kantoor of kunstenaar) */
+export async function getLocationLogbook(locationId: number, limit = 100) {
+  const rows = await db
+    .select({
+      movement: inventoryMovements,
+      product: products,
+      user: users,
+    })
+    .from(inventoryMovements)
+    .innerJoin(products, eq(products.id, inventoryMovements.productId))
+    .leftJoin(users, eq(users.id, inventoryMovements.userId))
+    .where(
+      sql`${inventoryMovements.locationId} = ${locationId}
+        OR ${inventoryMovements.locationFromId} = ${locationId}
+        OR ${inventoryMovements.locationToId} = ${locationId}`
+    )
+    .orderBy(sql`${inventoryMovements.createdAt} DESC`)
+    .limit(limit);
+
+  const allLocs = await db.select().from(inventoryLocations);
+  const locMap = new Map(allLocs.map((l) => [l.id, l.name]));
+
+  return rows.map((row) => ({
+    ...row,
+    fromName: row.movement.locationFromId
+      ? locMap.get(row.movement.locationFromId)
+      : null,
+    toName: row.movement.locationToId
+      ? locMap.get(row.movement.locationToId)
+      : null,
+  }));
 }

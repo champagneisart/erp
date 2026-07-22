@@ -27,7 +27,7 @@ async function main() {
   await db.insert(schema.users).values({
     email: "artist@champagneisart.nl",
     passwordHash: await bcrypt.hash("artist123", 10),
-    name: "Studio Kunstenaar",
+    name: "Darrin",
     role: "artist",
   });
 
@@ -74,7 +74,7 @@ async function main() {
     .insert(schema.inventoryLocations)
     .values({
       slug: "artist-2",
-      name: "Bij Studio Kunstenaar",
+      name: "Kunstenaar Darrin",
       locationType: "artist",
       artistUserId: 2,
     })
