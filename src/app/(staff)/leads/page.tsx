@@ -45,7 +45,7 @@ export default async function LeadsPage() {
       <div className="flex flex-wrap gap-2 text-xs text-muted">
         <span className="filter-pill">Contact → leads</span>
         <span className="filter-pill">Custom Champagne → leads</span>
-        <span className="filter-pill">Goedgekeurd → order + nummer</span>
+        <span className="filter-pill">Elke aanvraag → order mogelijk</span>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">

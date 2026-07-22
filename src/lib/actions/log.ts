@@ -1,5 +1,6 @@
+import { and, desc, eq } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { activityLog } from "@/db/schema";
+import { activityLog, users } from "@/db/schema";
 
 export async function logActivity(params: {
   entityType: string;
@@ -17,4 +18,20 @@ export async function logActivity(params: {
     toValue: params.toValue ?? null,
     userId: params.userId ?? null,
   });
+}
+
+export async function getOrderActivityLogs(orderId: number) {
+  const rows = await db
+    .select({ log: activityLog, user: users })
+    .from(activityLog)
+    .leftJoin(users, eq(activityLog.userId, users.id))
+    .where(
+      and(eq(activityLog.entityType, "order"), eq(activityLog.entityId, orderId))
+    )
+    .orderBy(desc(activityLog.createdAt));
+
+  return rows.map(({ log, user }) => ({
+    ...log,
+    userName: user?.name ?? null,
+  }));
 }

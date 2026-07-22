@@ -2,7 +2,6 @@ import { notFound } from "next/navigation";
 import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import {
-  activityLog,
   customers,
   orders,
   products,
@@ -11,6 +10,7 @@ import {
   workInstructions,
 } from "@/db/schema";
 import { checkArtistStock, getAllProducts } from "@/lib/actions/inventory";
+import { getOrderActivityLogs } from "@/lib/actions/log";
 import {
   assignArtist,
   generateStatusLink,
@@ -24,6 +24,11 @@ import {
   canOrderTransition,
   type OrderStatus,
 } from "@/lib/constants/statuses";
+import {
+  formatActivityAction,
+  formatActivityValue,
+} from "@/lib/constants/activity-log";
+import { formatDateTime } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
@@ -68,10 +73,7 @@ export default async function OrderDetailPage({
     .select()
     .from(statusPageTokens)
     .where(eq(statusPageTokens.orderId, orderId));
-  const logs = await db
-    .select()
-    .from(activityLog)
-    .where(eq(activityLog.entityId, orderId));
+  const logs = await getOrderActivityLogs(orderId);
 
   const current = order.status as OrderStatus;
 
@@ -270,14 +272,39 @@ export default async function OrderDetailPage({
 
       <Card>
         <CardHeader>
-          <CardTitle>Activiteit</CardTitle>
+          <CardTitle>Logboek</CardTitle>
         </CardHeader>
         <CardContent>
-          {logs.map((l) => (
-            <p key={l.id} className="text-xs text-muted">
-              {l.createdAt}: {l.action} {l.fromValue} → {l.toValue}
-            </p>
-          ))}
+          {logs.length === 0 ? (
+            <p className="text-sm text-muted">Nog geen activiteit geregistreerd.</p>
+          ) : (
+            <ul className="space-y-3">
+              {logs.map((l) => (
+                <li
+                  key={l.id}
+                  className="border-b border-border/50 pb-3 text-sm last:border-0 last:pb-0"
+                >
+                  <div className="flex flex-wrap items-baseline justify-between gap-2">
+                    <span className="font-medium">{formatActivityAction(l.action)}</span>
+                    <span className="text-xs text-muted">{formatDateTime(l.createdAt)}</span>
+                  </div>
+                  {(l.fromValue || l.toValue) && (
+                    <p className="mt-1 text-muted">
+                      {l.fromValue && l.action === "status_change" && (
+                        <>
+                          {formatActivityValue(l.action, l.fromValue)} →{" "}
+                        </>
+                      )}
+                      {l.toValue && formatActivityValue(l.action, l.toValue)}
+                    </p>
+                  )}
+                  {l.userName && (
+                    <p className="mt-0.5 text-xs text-muted">door {l.userName}</p>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
         </CardContent>
       </Card>
     </div>

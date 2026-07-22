@@ -17,6 +17,7 @@ import {
   type MessageClassification,
 } from "@/lib/ai";
 import type { NormalizedFormData } from "@/lib/webhooks/parse-form-payload";
+import { buildLeadDescription, formatAanvraagTitle } from "@/lib/webhooks/form-display";
 
 function revalidateWebhookPages() {
   revalidatePath("/leads");
@@ -134,18 +135,6 @@ function buildRawPayload(data: NormalizedFormData) {
   return JSON.stringify(data.raw, null, 2);
 }
 
-function buildDescription(data: NormalizedFormData) {
-  const parts: string[] = [];
-  if (data.message) parts.push(data.message);
-  if (data.subject) parts.push(`Onderwerp: ${data.subject}`);
-
-  for (const [key, value] of Object.entries(data.extra)) {
-    parts.push(`${key.replace(/_/g, " ")}: ${value}`);
-  }
-
-  return parts.join("\n\n").trim() || "Inzending via website";
-}
-
 function workInstructionFromForm(data: NormalizedFormData) {
   const extraNotes =
     Object.keys(data.extra).length > 0
@@ -215,14 +204,14 @@ export async function processContactForm(data: NormalizedFormData) {
       customerId: customer.id,
       source: "website",
       title: leadTitle,
-      description: buildDescription(data),
+      description: buildLeadDescription(data),
       rawPayload: buildRawPayload(data),
       status: "new",
     })
     .returning();
 
   const msg = await createInboxEntry({
-    body: buildDescription(data),
+    body: buildLeadDescription(data),
     subject: data.subject ?? "Contactformulier website",
     channel: "website_contact",
     customerId: customer.id,
@@ -248,12 +237,7 @@ export async function processContactForm(data: NormalizedFormData) {
 
 export async function processAanvraagForm(data: NormalizedFormData) {
   const customer = await findOrCreateCustomer(data);
-  const sourceSlug = data.raw.source_url?.match(/gepersonaliseerde-champagne\/([^/?#]+)/)?.[1];
-  const leadTitle =
-    data.title ??
-    data.subject ??
-    data.formName ??
-    (sourceSlug ? `Aanvraag: ${sourceSlug.replace(/-/g, " ")}` : "Nieuwe aanvraag via website");
+  const leadTitle = formatAanvraagTitle(data);
 
   const [lead] = await db
     .insert(leads)
@@ -261,7 +245,7 @@ export async function processAanvraagForm(data: NormalizedFormData) {
       customerId: customer.id,
       source: "website",
       title: leadTitle,
-      description: buildDescription(data),
+      description: buildLeadDescription(data),
       rawPayload: buildRawPayload(data),
       status: "new",
     })
@@ -276,7 +260,7 @@ export async function processAanvraagForm(data: NormalizedFormData) {
   });
 
   await createInboxEntry({
-    body: buildDescription(data),
+    body: buildLeadDescription(data),
     subject: data.title ?? "Aanvraag via website",
     channel: "website_aanvraag",
     customerId: customer.id,
@@ -346,7 +330,7 @@ export async function processOntwerpdetailsForm(data: NormalizedFormData) {
       await db
         .update(leads)
         .set({
-          description: `${recentLead.description ?? ""}\n\n--- Ontwerpdetails (wacht op order) ---\n${buildDescription(data)}`.trim(),
+          description: `${recentLead.description ?? ""}\n\n--- Ontwerpdetails (wacht op order) ---\n${buildLeadDescription(data)}`.trim(),
           rawPayload: buildRawPayload(data),
           updatedAt: new Date().toISOString(),
         })
@@ -358,7 +342,7 @@ export async function processOntwerpdetailsForm(data: NormalizedFormData) {
           customerId: customer.id,
           source: "website",
           title: "Ontwerpdetails (nog geen order)",
-          description: buildDescription(data),
+          description: buildLeadDescription(data),
           rawPayload: buildRawPayload(data),
           status: "new",
         })
@@ -383,7 +367,7 @@ export async function processOntwerpdetailsForm(data: NormalizedFormData) {
   });
 
   await createInboxEntry({
-    body: buildDescription(data),
+    body: buildLeadDescription(data),
     subject: "Ontwerpdetails via website",
     channel: "website_ontwerpdetails",
     customerId: customer?.id,

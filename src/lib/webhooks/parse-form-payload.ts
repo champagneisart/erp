@@ -1,4 +1,5 @@
 import { isFormType, type FormType } from "@/lib/webhooks/form-types";
+import { isRelevantFormField } from "@/lib/webhooks/form-display";
 
 export type NormalizedFormData = {
   formType: FormType;
@@ -320,13 +321,8 @@ export function normalizeFormPayload(
       key === "post_id"
     )
       continue;
+    if (!isRelevantFormField(key)) continue;
     data.extra[key] = value;
-  }
-
-  if (!data.message && Object.keys(data.extra).length > 0) {
-    data.message = Object.entries(data.extra)
-      .map(([k, v]) => `${k.replace(/_/g, " ")}: ${v}`)
-      .join("\n");
   }
 
   return data;

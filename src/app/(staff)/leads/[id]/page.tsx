@@ -4,6 +4,8 @@ import { db } from "@/lib/db";
 import { customers, leads, orders } from "@/db/schema";
 import {
   convertLeadToOrder,
+  deleteLead,
+  updateLead,
   updateLeadStatus,
 } from "@/lib/actions/leads";
 import {
@@ -12,6 +14,8 @@ import {
   canLeadTransition,
   type LeadStatus,
 } from "@/lib/constants/statuses";
+import { parseLeadDisplaySections } from "@/lib/webhooks/form-display";
+import { LeadEditSection } from "@/components/leads/lead-edit-form";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -40,32 +44,94 @@ export default async function LeadDetailPage({
     .where(eq(orders.leadId, leadId))
     .limit(1);
 
+  const sections = parseLeadDisplaySections(lead.rawPayload, lead.description);
+
+  async function saveLead(formData: FormData) {
+    "use server";
+    await updateLead(leadId, {
+      title: (formData.get("title") as string) || undefined,
+      description: (formData.get("description") as string) || undefined,
+      customerName: (formData.get("customerName") as string) || undefined,
+      customerEmail: (formData.get("customerEmail") as string) || undefined,
+      customerPhone: (formData.get("customerPhone") as string) || undefined,
+      customerCompany: (formData.get("customerCompany") as string) || undefined,
+    });
+  }
+
   return (
     <div className="page-content space-y-6">
-      <h1 className="text-xl font-semibold sm:text-2xl">
-        Aanvraag #{lead.id} — {lead.title ?? "Zonder titel"}
-      </h1>
-      <Badge>{LEAD_STATUS_LABELS[current] ?? current}</Badge>
+      <p className="text-sm text-muted">
+        <Link href="/leads" className="hover:text-gold-bright">
+          ← Alle aanvragen
+        </Link>
+      </p>
 
-      {order && (
+      <LeadEditSection
+        title={lead.title ?? ""}
+        description={lead.description ?? ""}
+        customerName={customer?.name ?? ""}
+        customerEmail={customer?.email ?? ""}
+        customerPhone={customer?.phone ?? ""}
+        customerCompany={customer?.company ?? ""}
+        onSave={saveLead}
+      >
+        <div className="space-y-2">
+          <h1 className="text-xl font-semibold sm:text-2xl">
+            Aanvraag #{lead.id}
+          </h1>
+          <p className="text-lg text-gold-dim">{lead.title ?? "Zonder titel"}</p>
+          <Badge>{LEAD_STATUS_LABELS[current] ?? current}</Badge>
+        </div>
+      </LeadEditSection>
+
+      {order ? (
         <Card>
-          <CardContent className="pt-6 text-sm">
+          <CardHeader>
+            <CardTitle>Order</CardTitle>
+          </CardHeader>
+          <CardContent className="text-sm">
             <p>
-              <strong>Ordernummer:</strong>{" "}
-              <Link href={`/orders/${order.id}`} className="text-gold-bright hover:underline">
+              Deze aanvraag is omgezet naar order{" "}
+              <Link href={`/orders/${order.id}`} className="font-medium text-gold-bright hover:underline">
                 {order.orderNumber}
               </Link>
+              .
             </p>
           </CardContent>
         </Card>
-      )}
+      ) : !["cancelled", "converted"].includes(lead.status) ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>Order aanmaken</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <p className="text-sm text-muted">
+              Maak een order aan op basis van deze aanvraag. De klant wordt automatisch
+              aangemaakt of gekoppeld als dat nog niet is gebeurd.
+            </p>
+            <form
+              action={async () => {
+                "use server";
+                const created = await convertLeadToOrder(leadId);
+                redirect(`/orders/${created.id}`);
+              }}
+            >
+              <Button type="submit">Omzetten naar order</Button>
+            </form>
+          </CardContent>
+        </Card>
+      ) : null}
 
       <Card>
-        <CardContent className="space-y-2 pt-6 text-sm">
+        <CardHeader>
+          <CardTitle>Klant</CardTitle>
+        </CardHeader>
+        <CardContent className="grid gap-2 text-sm sm:grid-cols-2">
           <p>
-            <strong>Klant:</strong>{" "}
+            <span className="text-muted">Naam</span>
+            <br />
             {customer ? (
-              <Link href={`/customers/${customer.id}`} className="hover:text-gold-bright">
+              <Link href={`/customers/${customer.id}`} className="font-medium hover:text-gold-bright">
                 {customer.name}
               </Link>
             ) : (
@@ -74,20 +140,67 @@ export default async function LeadDetailPage({
           </p>
           {customer?.email && (
             <p>
-              <strong>E-mail:</strong> {customer.email}
+              <span className="text-muted">E-mail</span>
+              <br />
+              <a href={`mailto:${customer.email}`} className="font-medium hover:text-gold-bright">
+                {customer.email}
+              </a>
             </p>
           )}
           {customer?.phone && (
             <p>
-              <strong>Telefoon:</strong> {customer.phone}
+              <span className="text-muted">Telefoon</span>
+              <br />
+              <a href={`tel:${customer.phone}`} className="font-medium hover:text-gold-bright">
+                {customer.phone}
+              </a>
+            </p>
+          )}
+          {customer?.company && (
+            <p>
+              <span className="text-muted">Bedrijf</span>
+              <br />
+              <span className="font-medium">{customer.company}</span>
             </p>
           )}
           <p>
-            <strong>Bron:</strong> {lead.source}
+            <span className="text-muted">Bron</span>
+            <br />
+            <span className="font-medium capitalize">{lead.source}</span>
           </p>
-          <p className="whitespace-pre-wrap">{lead.description}</p>
         </CardContent>
       </Card>
+
+      {sections.map((section) => (
+        <Card key={section.title}>
+          <CardHeader>
+            <CardTitle>{section.title}</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <dl className="grid gap-3 text-sm sm:grid-cols-2">
+              {section.items.map((item) => (
+                <div key={`${section.title}-${item.label}`} className="min-w-0">
+                  <dt className="text-muted">{item.label}</dt>
+                  <dd className="mt-0.5 font-medium break-words whitespace-pre-wrap">
+                    {item.value}
+                  </dd>
+                </div>
+              ))}
+            </dl>
+          </CardContent>
+        </Card>
+      ))}
+
+      {lead.rawPayload && (
+        <details className="rounded-lg border border-border bg-background/30 p-4 text-sm">
+          <summary className="cursor-pointer text-muted hover:text-foreground">
+            Ruwe formulierdata (technisch)
+          </summary>
+          <pre className="mt-3 max-h-64 overflow-auto whitespace-pre-wrap break-all text-xs text-muted">
+            {lead.rawPayload}
+          </pre>
+        </details>
+      )}
 
       <Card>
         <CardHeader>
@@ -110,16 +223,27 @@ export default async function LeadDetailPage({
         </CardContent>
       </Card>
 
-      {lead.status === "approved" && lead.customerId && !order && (
-        <form
-          action={async () => {
-            "use server";
-            const created = await convertLeadToOrder(leadId);
-            redirect(`/orders/${created.id}`);
-          }}
-        >
-          <Button type="submit">Omzetten naar order (ordernummer aanmaken)</Button>
-        </form>
+      {!order && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Verwijderen</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="mb-3 text-sm text-muted">
+              Verwijder deze aanvraag permanent. Niet mogelijk als er al een order is.
+            </p>
+            <form
+              action={async () => {
+                "use server";
+                await deleteLead(leadId);
+              }}
+            >
+              <Button type="submit" variant="outline" className="text-red-400">
+                Aanvraag verwijderen
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
       )}
     </div>
   );

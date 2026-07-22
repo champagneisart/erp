@@ -7,6 +7,7 @@ import { db } from "@/lib/db";
 import {
   appSettings,
   orders,
+  users,
   workInstructions,
   statusPageTokens,
 } from "@/db/schema";
@@ -37,10 +38,44 @@ export async function updateOrder(
   const session = await auth();
   assertStaff(session);
 
+  const [order] = await db.select().from(orders).where(eq(orders.id, id)).limit(1);
+  if (!order) throw new Error("Order niet gevonden");
+
+  const changes: string[] = [];
+  const labels: Record<string, string> = {
+    theme: "thema",
+    bottleFormat: "formaat",
+    quantity: "aantal",
+    deadline: "deadline",
+    fulfillment: "levering",
+    productId: "fles",
+    expectedReadyDate: "verwachte datum",
+    invoiceStatus: "factuurstatus",
+    trackingNumber: "track & trace",
+  };
+
+  for (const [key, label] of Object.entries(labels)) {
+    const k = key as keyof typeof data;
+    if (data[k] === undefined) continue;
+    const from = String(order[k as keyof typeof order] ?? "—");
+    const to = String(data[k] ?? "—");
+    if (from !== to) changes.push(`${label}: ${from} → ${to}`);
+  }
+
   await db
     .update(orders)
     .set({ ...data, updatedAt: new Date().toISOString() } as typeof orders.$inferInsert)
     .where(eq(orders.id, id));
+
+  if (changes.length > 0) {
+    await logActivity({
+      entityType: "order",
+      entityId: id,
+      action: "updated",
+      toValue: changes.join("; "),
+      userId: Number(session!.user!.id),
+    });
+  }
 
   revalidatePath(`/orders/${id}`);
   revalidatePath("/orders");
@@ -97,10 +132,28 @@ export async function assignArtist(orderId: number, artistUserId: number) {
   const session = await auth();
   assertStaff(session);
 
+  const [order] = await db.select().from(orders).where(eq(orders.id, orderId)).limit(1);
+  if (!order) throw new Error("Order niet gevonden");
+
+  const [artist] = await db
+    .select()
+    .from(users)
+    .where(eq(users.id, artistUserId))
+    .limit(1);
+
   await db
     .update(orders)
     .set({ artistUserId, updatedAt: new Date().toISOString() })
     .where(eq(orders.id, orderId));
+
+  await logActivity({
+    entityType: "order",
+    entityId: orderId,
+    action: "artist_assigned",
+    fromValue: order.artistUserId ? String(order.artistUserId) : undefined,
+    toValue: artist?.name ?? String(artistUserId),
+    userId: Number(session!.user!.id),
+  });
 
   revalidatePath(`/orders/${orderId}`);
   revalidatePath("/planning");
@@ -138,6 +191,13 @@ export async function upsertWorkInstruction(
     await db.insert(workInstructions).values({ orderId, ...data });
   }
 
+  await logActivity({
+    entityType: "order",
+    entityId: orderId,
+    action: "work_instruction_updated",
+    userId: Number(session!.user!.id),
+  });
+
   revalidatePath(`/orders/${orderId}`);
 }
 
@@ -151,11 +211,22 @@ export async function generateStatusLink(orderId: number) {
     token,
   });
 
+  await logActivity({
+    entityType: "order",
+    entityId: orderId,
+    action: "status_link_created",
+    toValue: token.slice(0, 8) + "…",
+    userId: Number(session!.user!.id),
+  });
+
   revalidatePath(`/orders/${orderId}`);
   return token;
 }
 
 export async function approveGuidelineOnOrder(orderId: number) {
+  const session = await auth();
+  assertStaff(session);
+
   await db
     .update(orders)
     .set({
@@ -163,6 +234,14 @@ export async function approveGuidelineOnOrder(orderId: number) {
       updatedAt: new Date().toISOString(),
     })
     .where(eq(orders.id, orderId));
+
+  await logActivity({
+    entityType: "order",
+    entityId: orderId,
+    action: "guideline_approved",
+    userId: Number(session!.user!.id),
+  });
+
   revalidatePath(`/orders/${orderId}`);
 }
 
