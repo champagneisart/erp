@@ -7,6 +7,7 @@ import {
   startAgentChat,
   type ChatMessageDto,
 } from "@/lib/actions/agent-chat";
+import { teachAgentFromCorrection } from "@/lib/actions/agent-learning";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
@@ -15,6 +16,7 @@ type AgentOption = { id: number; name: string; slug: string; purpose: string };
 
 export function AgentChatPanel({ agents }: { agents: AgentOption[] }) {
   const [sessionId, setSessionId] = useState<number | null>(null);
+  const [activeAgentId, setActiveAgentId] = useState<number | null>(null);
   const [messages, setMessages] = useState<ChatMessageDto[]>([]);
   const [input, setInput] = useState("");
   const [pending, startTransition] = useTransition();
@@ -29,6 +31,7 @@ export function AgentChatPanel({ agents }: { agents: AgentOption[] }) {
       const id = await startAgentChat(agentId);
       const msgs = await getChatMessages(id);
       setSessionId(id);
+      setActiveAgentId(agentId);
       setMessages(msgs);
     });
   }
@@ -90,6 +93,7 @@ export function AgentChatPanel({ agents }: { agents: AgentOption[] }) {
               className="rounded-full"
               onClick={() => {
                 setSessionId(null);
+                setActiveAgentId(null);
                 setMessages([]);
               }}
             >
@@ -122,6 +126,9 @@ export function AgentChatPanel({ agents }: { agents: AgentOption[] }) {
                       ))}
                     </ul>
                   </details>
+                )}
+                {m.role === "assistant" && activeAgentId && (
+                  <AgentCorrectionForm agentId={activeAgentId} wrongAnswer={m.content} />
                 )}
               </div>
             ))}
@@ -179,6 +186,78 @@ export function AgentChatPanel({ agents }: { agents: AgentOption[] }) {
             </form>
           </div>
         </>
+      )}
+    </div>
+  );
+}
+
+function AgentCorrectionForm({
+  agentId,
+  wrongAnswer,
+}: {
+  agentId: number;
+  wrongAnswer: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const [correct, setCorrect] = useState("");
+  const [saved, setSaved] = useState(false);
+  const [pending, startTransition] = useTransition();
+
+  if (saved) {
+    return (
+      <p className="mt-3 text-xs text-emerald-400">
+        Correctie opgeslagen — agent gebruikt dit bij het volgende antwoord.
+      </p>
+    );
+  }
+
+  return (
+    <div className="mt-3 border-t border-gold/10 pt-2">
+      {!open ? (
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          className="text-xs text-muted underline hover:text-gold-bright"
+        >
+          Dit antwoord was fout — leer hiervan
+        </button>
+      ) : (
+        <form
+          className="space-y-2"
+          onSubmit={(e) => {
+            e.preventDefault();
+            startTransition(async () => {
+              await teachAgentFromCorrection({
+                agentId,
+                wrongAnswer,
+                correctAnswer: correct,
+              });
+              setSaved(true);
+            });
+          }}
+        >
+          <p className="text-xs text-muted">Wat had de agent moeten zeggen/doen?</p>
+          <Input
+            value={correct}
+            onChange={(e) => setCorrect(e.target.value)}
+            placeholder="Juiste prijs, formulering, regel..."
+            required
+            className="text-xs"
+          />
+          <div className="flex gap-2">
+            <Button type="submit" variant="outline" className="h-8 text-xs" disabled={pending}>
+              Opslaan als correctie
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              className="h-8 text-xs"
+              onClick={() => setOpen(false)}
+            >
+              Annuleren
+            </Button>
+          </div>
+        </form>
       )}
     </div>
   );

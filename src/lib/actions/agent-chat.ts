@@ -26,6 +26,10 @@ import {
   getPricingAgentGreeting,
   processPricingAgentTurn,
 } from "@/lib/ai/pricing-agent";
+import {
+  getSpecialistAgentGreeting,
+  processSpecialistAgentTurn,
+} from "@/lib/ai/specialist-agent";
 
 export type ChatMessageDto = {
   id: number;
@@ -95,6 +99,10 @@ export async function startAgentChat(agentId: number) {
     questionType = g.questionType;
   } else if (agent.slug === "pricing") {
     const g = getPricingAgentGreeting();
+    greeting = g.content;
+    questionType = g.questionType;
+  } else if (agent.slug === "customer_contact" || agent.slug === "work_instruction") {
+    const g = getSpecialistAgentGreeting(agent.slug);
     greeting = g.content;
     questionType = g.questionType;
   }
@@ -222,6 +230,17 @@ export async function sendChatMessage(
     createdLeadId = reply.createdLeadId;
   } else if (agent?.slug === "pricing") {
     replyContent = await processPricingAgentTurn(content);
+    questionType = "text";
+  } else if (
+    agent &&
+    (agent.slug === "customer_contact" || agent.slug === "work_instruction")
+  ) {
+    replyContent = await processSpecialistAgentTurn(
+      agent.id,
+      agent.slug,
+      content,
+      conversationContext
+    );
     questionType = "text";
   } else if (agent?.slug === "lead_processing") {
     const reply = await processLeadAgentTurn({

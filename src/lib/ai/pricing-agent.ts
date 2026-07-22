@@ -1,8 +1,5 @@
-import { eq } from "drizzle-orm";
-import { db } from "@/lib/db";
-import { aiAgentProfiles, aiTrainingItems } from "@/db/schema";
+import { buildAgentSystemPromptBySlug } from "@/lib/ai/agent-knowledge";
 import { callOpenAiText } from "@/lib/ai";
-import { truncateForPrompt } from "@/lib/knowledge/text-upload";
 
 const FALLBACK_PROMPT = `Je bent de Prijs Agent voor Champagne is Art Studio.
 Bereken inkoop (fles + beschildering), verkoop excl./incl. BTW (21%), marge en totaal op basis van aantal.
@@ -10,31 +7,7 @@ Vraag ontbrekende info door (formaat, aantal, incl./excl. fles, merk).
 Deel marge alleen intern.`;
 
 export async function getPricingAgentSystemPrompt(): Promise<string> {
-  const [agent] = await db
-    .select()
-    .from(aiAgentProfiles)
-    .where(eq(aiAgentProfiles.slug, "pricing"))
-    .limit(1);
-
-  const base = agent?.systemPrompt?.trim() || FALLBACK_PROMPT;
-  if (!agent) return base;
-
-  const items = await db
-    .select()
-    .from(aiTrainingItems)
-    .where(eq(aiTrainingItems.agentId, agent.id))
-    .limit(8);
-
-  if (items.length === 0) return base;
-
-  const trainingBlock = items
-    .map(
-      (item) =>
-        `### ${item.title} (${item.category})\n${truncateForPrompt(item.content, 4000)}`
-    )
-    .join("\n\n");
-
-  return `${base}\n\n---\n\n## Aanvullende trainingsdata\n${trainingBlock}`;
+  return buildAgentSystemPromptBySlug("pricing", FALLBACK_PROMPT);
 }
 
 export async function consultPricingAgent(
