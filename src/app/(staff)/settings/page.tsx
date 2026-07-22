@@ -14,10 +14,11 @@ import { db } from "@/lib/db";
 import { appSettings } from "@/db/schema";
 import { isMailjetConfigured } from "@/lib/email/mailjet";
 import {
-  getWebhookFormsUrlForAvada,
   isWebhookConfigured,
 } from "@/lib/webhooks/config";
 import { getWebhookCaptures, isWebhookProcessingEnabled } from "@/lib/webhooks/capture";
+import { resolveAvadaFormTypeDetailed } from "@/lib/webhooks/avada-forms";
+import { processStoredWebhookCaptures } from "@/lib/actions/webhooks";
 import { eq } from "drizzle-orm";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -67,7 +68,6 @@ export default async function SettingsPage() {
 
   const mailjetReady = isMailjetConfigured();
   const webhookReady = isWebhookConfigured();
-  const avadaWebhookUrl = getWebhookFormsUrlForAvada();
   const webhookCaptures = isAdmin(session) ? await getWebhookCaptures() : [];
   const webhookProcessing = isWebhookProcessingEnabled();
 
@@ -197,18 +197,37 @@ export default async function SettingsPage() {
                 {webhookReady ? "WEBHOOK_SECRET ingesteld" : "WEBHOOK_SECRET ontbreekt in Vercel"}
               </span>
             </p>
+            <p>
+              Verwerking:{" "}
+              <span className={webhookProcessing ? "text-emerald-400" : "text-amber-400"}>
+                {webhookProcessing
+                  ? "Aan — nieuwe formulieren → Aanvragen/Orders"
+                  : "Alleen capture (WEBHOOK_CAPTURE=true)"}
+              </span>
+            </p>
             <div className="space-y-1">
-              <p className="font-medium text-foreground">URL voor Avada-formulier (Action → Webhook)</p>
-              <p className="break-all rounded-md border border-border bg-background/50 p-3 font-mono text-xs text-foreground">
-                {avadaWebhookUrl}
-              </p>
+              <p className="font-medium text-foreground">WordPress-plugin (CIA ERP Webhook)</p>
               <p className="text-muted">
-                Plak deze URL in elk Avada-formulier. Het secret zit in de query string — Avada kan
-                geen custom headers. Nu alleen <strong>capture</strong>: payloads worden opgeslagen
-                hieronder. Verwerking naar leads/orders volgt later (
-                <code className="text-foreground">WEBHOOK_PROCESS=true</code> in Vercel).
+                Formulieren komen binnen via de plugin (database + CIA ERP actie). Geen Send To URL
+                meer nodig. Onderstaande captures zijn het logboek.
               </p>
             </div>
+            {webhookCaptures.length > 0 && (
+              <form
+                action={async () => {
+                  "use server";
+                  await processStoredWebhookCaptures();
+                }}
+              >
+                <Button type="submit" variant="secondary">
+                  Opgeslagen captures verwerken naar Aanvragen
+                </Button>
+                <p className="mt-2 text-xs text-muted">
+                  Eenmalig: verwerk alles wat al binnenkwam vóór automatische verwerking. Slaat
+                  plugin-test over.
+                </p>
+              </form>
+            )}
             {webhookCaptures.length === 0 ? (
               <p className="text-muted">Nog geen formulieren ontvangen. Dien een test in op de website.</p>
             ) : (
@@ -216,24 +235,35 @@ export default async function SettingsPage() {
                 <p className="font-medium text-foreground">
                   Laatste ontvangen ({webhookCaptures.length})
                 </p>
-                {webhookCaptures.slice(0, 5).map((capture) => (
+                {webhookCaptures.slice(0, 5).map((capture) => {
+                  const detected = resolveAvadaFormTypeDetailed(
+                    capture.flat.form_id,
+                    capture.flat.form_name,
+                    capture.flat
+                  );
+                  return (
                   <details
                     key={capture.id}
                     className="rounded-md border border-border bg-background/30 p-3"
                   >
                     <summary className="cursor-pointer text-foreground">
                       {new Date(capture.receivedAt).toLocaleString("nl-NL")} —{" "}
-                      {Object.keys(capture.flat).length} velden ({capture.contentType})
+                      {detected.type ?? "?"} ({capture.flat.form_id ?? "geen id"}) —{" "}
+                      {Object.keys(capture.flat).length} velden
                     </summary>
+                    <p className="mt-2 text-xs text-muted">{detected.reason}</p>
                     <pre className="mt-3 max-h-64 overflow-auto whitespace-pre-wrap break-all text-xs text-muted">
                       {JSON.stringify(capture.flat, null, 2)}
                     </pre>
                   </details>
-                ))}
+                  );
+                })}
               </div>
             )}
-            {webhookProcessing && (
-              <p className="text-emerald-400">WEBHOOK_PROCESS=true — automatische verwerking staat aan.</p>
+            {!webhookProcessing && (
+              <p className="text-amber-400">
+                Zet WEBHOOK_CAPTURE niet op true — verwerking staat standaard aan na deploy.
+              </p>
             )}
           </CardContent>
         </Card>

@@ -2,10 +2,13 @@ import Link from "next/link";
 import {
   addBottles,
   createProduct,
+  deleteProduct,
   getInventoryPageData,
   markShipmentReceived,
   registerIncomingShipment,
+  setStockQuantity,
   transferStock,
+  updateProduct,
 } from "@/lib/actions/inventory";
 import { BOTTLE_FORMATS } from "@/lib/constants/inventory";
 import { Button } from "@/components/ui/button";
@@ -84,15 +87,49 @@ export default async function InventoryPage() {
 
           <ul className="space-y-2 md:hidden">
             {products.map((p) => (
-              <li key={p.id} className="mobile-card space-y-1 text-sm">
-                <p className="font-medium">{p.name}</p>
+              <li key={p.id} className="mobile-card space-y-2 text-sm">
+                <details>
+                  <summary className="cursor-pointer font-medium">{p.name}</summary>
+                  <form
+                    action={async (fd) => {
+                      "use server";
+                      await updateProduct(p.id, {
+                        name: fd.get("name") as string,
+                        brand: (fd.get("brand") as string) || undefined,
+                        format: (fd.get("format") as string) || undefined,
+                        purchasePriceExVat: (fd.get("purchasePriceExVat") as string) || undefined,
+                        sellPriceExVat: (fd.get("sellPriceExVat") as string) || undefined,
+                        sellPriceIncVat: (fd.get("sellPriceIncVat") as string) || undefined,
+                      });
+                    }}
+                    className="form-stack mt-2"
+                  >
+                    <Input name="name" defaultValue={p.name} required />
+                    <Input name="brand" defaultValue={p.brand ?? ""} placeholder="Merk" />
+                    <Select name="format" defaultValue={p.format ?? ""}>
+                      <option value="">Formaat</option>
+                      {BOTTLE_FORMATS.map((f) => (
+                        <option key={f} value={f}>{f}</option>
+                      ))}
+                    </Select>
+                    <Input name="purchasePriceExVat" defaultValue={p.purchasePriceExVat ?? ""} />
+                    <Input name="sellPriceExVat" defaultValue={p.sellPriceExVat ?? ""} />
+                    <Input name="sellPriceIncVat" defaultValue={p.sellPriceIncVat ?? ""} />
+                    <Button type="submit" variant="outline">Opslaan</Button>
+                  </form>
+                  <form
+                    action={async () => {
+                      "use server";
+                      await deleteProduct(p.id);
+                    }}
+                    className="mt-2"
+                  >
+                    <Button type="submit" variant="outline" className="text-red-400">Verwijderen</Button>
+                  </form>
+                </details>
                 <div className="flex flex-wrap gap-x-3 gap-y-1 text-muted">
                   {p.brand && <span>{p.brand}</span>}
                   {p.format && <span>{p.format}</span>}
-                </div>
-                <div className="flex justify-between pt-1 text-xs">
-                  <span className="text-muted">Inkoop {formatEuro(p.purchasePriceExVat)}</span>
-                  <span>Verkoop {formatEuro(p.sellPriceIncVat)}</span>
                 </div>
               </li>
             ))}
@@ -109,17 +146,61 @@ export default async function InventoryPage() {
                   <th className="pr-4">Merk</th>
                   <th className="pr-4">Formaat</th>
                   <th className="pr-4">Inkoop</th>
-                  <th>Verkoop incl.</th>
+                  <th className="pr-4">Verkoop incl.</th>
+                  <th></th>
                 </tr>
               </thead>
               <tbody>
                 {products.map((p) => (
-                  <tr key={p.id} className="border-t border-border">
-                    <td className="py-2 pr-4">{p.name}</td>
+                  <tr key={p.id} className="border-t border-border align-top">
+                    <td className="py-2 pr-4">
+                      <details>
+                        <summary className="cursor-pointer hover:text-gold-bright">{p.name}</summary>
+                        <form
+                          action={async (fd) => {
+                            "use server";
+                            await updateProduct(p.id, {
+                              name: fd.get("name") as string,
+                              brand: (fd.get("brand") as string) || undefined,
+                              format: (fd.get("format") as string) || undefined,
+                              purchasePriceExVat: (fd.get("purchasePriceExVat") as string) || undefined,
+                              sellPriceExVat: (fd.get("sellPriceExVat") as string) || undefined,
+                              sellPriceIncVat: (fd.get("sellPriceIncVat") as string) || undefined,
+                            });
+                          }}
+                          className="form-stack mt-2 min-w-[14rem]"
+                        >
+                          <Input name="name" defaultValue={p.name} required />
+                          <Input name="brand" defaultValue={p.brand ?? ""} />
+                          <Select name="format" defaultValue={p.format ?? ""}>
+                            <option value="">Formaat</option>
+                            {BOTTLE_FORMATS.map((f) => (
+                              <option key={f} value={f}>{f}</option>
+                            ))}
+                          </Select>
+                          <Input name="purchasePriceExVat" defaultValue={p.purchasePriceExVat ?? ""} />
+                          <Input name="sellPriceExVat" defaultValue={p.sellPriceExVat ?? ""} />
+                          <Input name="sellPriceIncVat" defaultValue={p.sellPriceIncVat ?? ""} />
+                          <Button type="submit" variant="outline" className="text-xs">Opslaan</Button>
+                        </form>
+                      </details>
+                    </td>
                     <td className="pr-4">{p.brand ?? "—"}</td>
                     <td className="pr-4">{p.format ?? "—"}</td>
                     <td className="pr-4">{formatEuro(p.purchasePriceExVat)}</td>
                     <td>{formatEuro(p.sellPriceIncVat)}</td>
+                    <td className="py-2">
+                      <form
+                        action={async () => {
+                          "use server";
+                          await deleteProduct(p.id);
+                        }}
+                      >
+                        <Button type="submit" variant="outline" className="text-xs text-red-400">
+                          Verwijder
+                        </Button>
+                      </form>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -147,7 +228,7 @@ export default async function InventoryPage() {
                 <li className="text-muted">Nog geen voorraad</li>
               )}
               {officeStock.map(({ product, inv }) => (
-                <li key={product.id} className="flex items-start justify-between gap-2">
+                <li key={inv.id} className="flex items-start justify-between gap-2">
                   <span className="min-w-0 flex-1">{productLabel(product)}</span>
                   <span className="shrink-0 font-medium">{inv.quantity}x</span>
                 </li>
@@ -175,7 +256,7 @@ export default async function InventoryPage() {
                     <li className="text-muted">Nog geen voorraad</li>
                   )}
                   {stock.map(({ product, inv }) => (
-                    <li key={product.id} className="flex items-start justify-between gap-2">
+                    <li key={inv.id} className="flex items-start justify-between gap-2">
                       <span className="min-w-0 flex-1">{productLabel(product)}</span>
                       <span className="shrink-0 font-medium">{inv.quantity}x</span>
                     </li>
@@ -186,6 +267,54 @@ export default async function InventoryPage() {
           );
         })}
       </div>
+
+      {office && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Voorraad corrigeren</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="mb-4 text-sm text-muted">
+              Stel het exacte aantal in per locatie (bijv. duplicaat op 0 zetten).
+            </p>
+            <form
+              action={async (fd) => {
+                "use server";
+                await setStockQuantity({
+                  productId: Number(fd.get("productId")),
+                  locationId: Number(fd.get("locationId")),
+                  quantity: Number(fd.get("quantity")),
+                  note: (fd.get("note") as string) || undefined,
+                });
+              }}
+              className="form-stack sm:max-w-lg"
+            >
+              <Select name="productId" required>
+                <option value="">Welke fles?</option>
+                {products.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {productLabel(p)}
+                  </option>
+                ))}
+              </Select>
+              <Select name="locationId" required>
+                <option value="">Waar?</option>
+                <option value={office.id}>Kantoor</option>
+                {artistLocations.map((loc) => (
+                  <option key={loc.id} value={loc.id}>
+                    {loc.name}
+                  </option>
+                ))}
+              </Select>
+              <Input name="quantity" type="number" min={0} placeholder="Nieuw aantal" required />
+              <Input name="note" placeholder="Reden (optioneel)" />
+              <Button type="submit" variant="outline">
+                Aantal instellen
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
+      )}
 
       {office && artistLocations.length > 0 && (
         <Card>

@@ -70,6 +70,9 @@ export async function appendWebhookCapture(input: {
   return capture;
 }
 
+/** Standaard aan — alleen capture-only met WEBHOOK_CAPTURE=true */
 export function isWebhookProcessingEnabled(): boolean {
-  return process.env.WEBHOOK_PROCESS === "true";
+  if (process.env.WEBHOOK_CAPTURE === "true") return false;
+  if (process.env.WEBHOOK_PROCESS === "false") return false;
+  return true;
 }

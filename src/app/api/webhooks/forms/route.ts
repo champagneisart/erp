@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { AVADA_FORM_CATALOG, resolveAvadaFormType } from "@/lib/webhooks/avada-forms";
+import { AVADA_FORM_CATALOG, resolveAvadaFormTypeDetailed } from "@/lib/webhooks/avada-forms";
 import { verifyWebhookRequest } from "@/lib/webhooks/auth";
 import {
   appendWebhookCapture,
@@ -61,10 +61,18 @@ export async function POST(request: Request) {
 
     const capture = await appendWebhookCapture({ contentType, body, flat });
 
+    const detection = resolveAvadaFormTypeDetailed(
+      flat.form_id ?? (body.form_id !== undefined ? String(body.form_id) : undefined),
+      flat.form_name ?? (typeof body.form_name === "string" ? body.form_name : undefined),
+      flat
+    );
+
     console.info("[webhook/forms] capture", {
       id: capture.id,
       contentType,
       keys: Object.keys(flat),
+      detectedType: detection.type,
+      reason: detection.reason,
     });
 
     if (!isWebhookProcessingEnabled()) {
@@ -74,6 +82,8 @@ export async function POST(request: Request) {
         captureId: capture.id,
         receivedAt: capture.receivedAt,
         fields: flat,
+        detectedType: detection.type,
+        detectedReason: detection.reason,
         hint: "Payload opgeslagen. Zet WEBHOOK_PROCESS=true om leads/orders aan te maken.",
       });
     }
@@ -87,7 +97,7 @@ export async function POST(request: Request) {
       data.formName = body.form_name;
     }
 
-    const resolved = resolveAvadaFormType(data.formId, data.formName);
+    const resolved = detection.type;
     if (resolved === "ignore") {
       return NextResponse.json({
         ok: true,
@@ -96,6 +106,7 @@ export async function POST(request: Request) {
         captureId: capture.id,
         formId: data.formId,
         formName: data.formName,
+        detectedReason: detection.reason,
       });
     }
     if (resolved) data.formType = resolved;

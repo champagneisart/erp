@@ -7,6 +7,7 @@ import {
   inventory,
   inventoryLocations,
   inventoryMovements,
+  orders,
   products,
   supplierOrders,
   tasks,
@@ -185,6 +186,68 @@ export async function updateProduct(
 
   await db.update(products).set(data).where(eq(products.id, id));
   revalidatePath("/inventory");
+  revalidateTag("inventory-products", "max");
+}
+
+export async function deleteProduct(id: number) {
+  const session = await auth();
+  assertStaff(session);
+
+  const [used] = await db
+    .select({ id: orders.id })
+    .from(orders)
+    .where(eq(orders.productId, id))
+    .limit(1);
+  if (used) {
+    throw new Error("Fles type is gekoppeld aan een order — niet verwijderbaar");
+  }
+
+  await db.delete(products).where(eq(products.id, id));
+  revalidatePath("/inventory");
+  revalidateTag("inventory-products", "max");
+}
+
+/** Voorraad op een locatie instellen (bijv. duplicaat corrigeren of op 0) */
+export async function setStockQuantity(data: {
+  productId: number;
+  locationId: number;
+  quantity: number;
+  note?: string;
+}) {
+  const session = await auth();
+  assertStaff(session);
+  if (data.quantity < 0) throw new Error("Aantal kan niet negatief zijn");
+
+  const userId = Number(session!.user!.id);
+  const row = await ensureStockRow(data.productId, data.locationId);
+  const delta = data.quantity - row.quantity;
+
+  await db
+    .update(inventory)
+    .set({
+      quantity: data.quantity,
+      updatedAt: new Date().toISOString(),
+    })
+    .where(
+      and(
+        eq(inventory.productId, data.productId),
+        eq(inventory.locationId, data.locationId)
+      )
+    );
+
+  if (delta !== 0) {
+    await recordMovement({
+      productId: data.productId,
+      locationId: data.locationId,
+      movementType: "adjust",
+      quantity: Math.abs(delta),
+      note: data.note ?? `Voorraad gecorrigeerd (${row.quantity} → ${data.quantity})`,
+      userId,
+    });
+  }
+
+  revalidatePath("/inventory");
+  revalidatePath(`/inventory/log/${await locationSlug(data.locationId)}`);
 }
 
 /** Flessen bijboeken op kantoor of bij kunstenaar */

@@ -248,11 +248,12 @@ export async function processContactForm(data: NormalizedFormData) {
 
 export async function processAanvraagForm(data: NormalizedFormData) {
   const customer = await findOrCreateCustomer(data);
+  const sourceSlug = data.raw.source_url?.match(/gepersonaliseerde-champagne\/([^/?#]+)/)?.[1];
   const leadTitle =
     data.title ??
     data.subject ??
     data.formName ??
-    "Nieuwe aanvraag via website";
+    (sourceSlug ? `Aanvraag: ${sourceSlug.replace(/-/g, " ")}` : "Nieuwe aanvraag via website");
 
   const [lead] = await db
     .insert(leads)

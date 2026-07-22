@@ -93,8 +93,65 @@ const FIELD_ALIASES: Record<string, MappableField> = {
   aantal: "quantity",
   quantity: "quantity",
   deadline: "deadline",
+  bedrijfsnaam_optioneel: "company",
+  bedrijfsnaam: "company",
+  e_mailadres: "email",
+  naam_van_de_bestelling: "title",
+  onderwerp_of_thema_van_de_flesen: "theme",
+  kleurstelling: "colorScheme",
+  aantal_flessen: "quantity",
+  soort_fles: "style",
+  visuele_elementen: "visualElements",
+  tekstelementen: "textContent",
+  andere_elementen: "visualElements",
+  opmerkingen: "message",
+  levering: "subject",
   leverdatum: "deadline",
 };
+
+function combineNameParts(flat: Record<string, string>, data: NormalizedFormData) {
+  if (data.name) return;
+  const parts = [
+    flat.voornaam,
+    flat.first_name,
+    flat.firstname,
+    flat.achternaam,
+    flat.last_name,
+    flat.lastname,
+  ].filter(Boolean);
+  if (parts.length > 0) {
+    data.name = [...new Set(parts)].join(" ").trim();
+  }
+}
+
+function enrichCustomerFields(flat: Record<string, string>, data: NormalizedFormData) {
+  combineNameParts(flat, data);
+
+  if (!data.company && flat.bedrijfsnaam_optioneel) {
+    data.company = flat.bedrijfsnaam_optioneel;
+  }
+
+  if (!data.title && flat.naam_van_de_bestelling) {
+    data.title = flat.naam_van_de_bestelling;
+  }
+
+  if (!data.theme && flat.onderwerp_of_thema_van_de_flesen) {
+    data.theme = flat.onderwerp_of_thema_van_de_flesen;
+  }
+
+  const shipping = [flat.straatnaam_huisnr, flat.postcode_plaats].filter(Boolean).join(", ");
+  if (shipping) {
+    data.extra.afleveradres = shipping;
+  }
+
+  for (const [key, value] of Object.entries(flat)) {
+    if (!value) continue;
+    const k = key.toLowerCase();
+    if (k.includes("artist") || (k.includes("prijs") && k.includes("select"))) {
+      data.extra.artist_keuze = value;
+    }
+  }
+}
 
 function resolveFieldAlias(key: string): MappableField | null {
   if (FIELD_ALIASES[key]) return FIELD_ALIASES[key];
@@ -116,6 +173,10 @@ function resolveFieldAlias(key: string): MappableField | null {
   if (k.includes("bericht") || k.includes("message") || k.includes("opmerking") || k.includes("vraag"))
     return "message";
   if (k.includes("aantal") || k.includes("quantity")) return "quantity";
+  if (k.includes("elementen") && k.includes("tekst")) return "textContent";
+  if (k.includes("visueel")) return "visualElements";
+  if (k.includes("leverdatum") || k.includes("deadline")) return "deadline";
+  if (k.includes("levering") || k.includes("ophalen")) return "subject";
 
   return null;
 }
@@ -136,21 +197,6 @@ function extractFormMeta(body: Record<string, unknown>, flat: Record<string, str
     (typeof body.form_title === "string" ? body.form_title : undefined);
 
   return { formId, formName };
-}
-
-function combineNameParts(flat: Record<string, string>, data: NormalizedFormData) {
-  if (data.name) return;
-  const parts = [
-    flat.voornaam,
-    flat.first_name,
-    flat.firstname,
-    flat.achternaam,
-    flat.last_name,
-    flat.lastname,
-  ].filter(Boolean);
-  if (parts.length > 0) {
-    data.name = [...new Set(parts)].join(" ").trim();
-  }
 }
 
 function normalizeKey(key: string): string {
@@ -262,7 +308,7 @@ export function normalizeFormPayload(
     (data as Record<string, unknown>)[alias] = value;
   }
 
-  combineNameParts(flat, data);
+  enrichCustomerFields(flat, data);
 
   for (const [key, value] of Object.entries(flat)) {
     if (mappedKeys.has(key) || key === "form_type" || key === "type") continue;
