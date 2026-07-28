@@ -8,6 +8,7 @@ const nextConfig: NextConfig = {
   turbopack: {
     root,
   },
+  serverExternalPackages: ["bcryptjs", "@neondatabase/serverless"],
 };
 
 export default nextConfig;

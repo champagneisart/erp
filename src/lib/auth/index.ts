@@ -6,7 +6,7 @@ import { db } from "@/lib/db";
 import { users } from "@/db/schema";
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
-  secret: process.env.AUTH_SECRET,
+  secret: process.env.AUTH_SECRET?.trim(),
   trustHost: true,
   session: { strategy: "jwt" },
   pages: { signIn: "/login" },
