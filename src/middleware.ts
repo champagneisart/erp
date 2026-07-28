@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import type { NextRequest } from "next/server";
-import { getToken } from "next-auth/jwt";
+import { auth } from "@/lib/auth";
 import { isVercelAppHost } from "@/lib/auth/env";
 
 const APP_HOST = process.env.NEXT_PUBLIC_APP_HOST ?? "";
@@ -15,15 +14,16 @@ function getHostType(host: string): "app" | "artist" | "status" | "local" {
   if (h.startsWith("artist.")) return "artist";
   if (h.startsWith("status.")) return "status";
   if (h.startsWith("app.")) return "app";
-  // Single Vercel URL serves staff routes until custom subdomains are connected.
+  if (h.startsWith("orders.")) return "app";
   if (isVercelAppHost(h)) return "app";
   return "local";
 }
 
-export async function middleware(request: NextRequest) {
+export default auth((request) => {
   const { pathname } = request.nextUrl;
   const host = request.headers.get("host") ?? "localhost";
   const hostType = getHostType(host);
+  const session = request.auth;
 
   if (
     pathname.startsWith("/api/auth") ||
@@ -36,10 +36,6 @@ export async function middleware(request: NextRequest) {
 
   if (hostType === "status") {
     if (!pathname.startsWith("/portal")) {
-      const url = request.nextUrl.clone();
-      url.pathname = pathname.startsWith("/portal")
-        ? pathname
-        : `/portal${pathname === "/" ? "" : pathname}`;
       if (pathname === "/" || !pathname.startsWith("/portal")) {
         return NextResponse.rewrite(
           new URL(`/portal${pathname === "/" ? "" : pathname}`, request.url)
@@ -55,18 +51,6 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  const token = await getToken({
-    req: request,
-    secret: process.env.AUTH_SECRET,
-    secureCookie: process.env.NODE_ENV === "production",
-  });
-  const session = token
-    ? {
-        user: {
-          role: token.role as "admin" | "staff" | "artist",
-        },
-      }
-    : null;
   const isLogin = pathname === "/login";
   const isAuthPublic =
     isLogin ||
@@ -139,13 +123,12 @@ export async function middleware(request: NextRequest) {
   }
 
   if (session && isLogin) {
-    const dest =
-      session.user.role === "artist" ? "/artist" : "/dashboard";
+    const dest = session.user.role === "artist" ? "/artist" : "/dashboard";
     return NextResponse.redirect(new URL(dest, request.url));
   }
 
   return NextResponse.next();
-}
+});
 
 export const config = {
   matcher: ["/((?!_next/static|_next/image|.*\\..*).*)"],
