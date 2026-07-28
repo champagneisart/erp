@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import NextAuth from "next-auth";
+import { authConfig } from "@/lib/auth/auth.config";
 import { isVercelAppHost } from "@/lib/auth/env";
+
+const { auth } = NextAuth(authConfig);
 
 const APP_HOST = process.env.NEXT_PUBLIC_APP_HOST ?? "";
 const ARTIST_HOST = process.env.NEXT_PUBLIC_ARTIST_HOST ?? "";
