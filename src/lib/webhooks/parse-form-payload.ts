@@ -97,6 +97,7 @@ const FIELD_ALIASES: Record<string, MappableField> = {
   bedrijfsnaam_optioneel: "company",
   bedrijfsnaam: "company",
   e_mailadres: "email",
+  "e-mailadres": "email",
   naam_van_de_bestelling: "title",
   onderwerp_of_thema_van_de_flesen: "theme",
   kleurstelling: "colorScheme",

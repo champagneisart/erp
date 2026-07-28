@@ -49,34 +49,118 @@ async function findOrCreateCustomer(data: {
   return created;
 }
 
-async function resolveOrder(data: Pick<NormalizedFormData, "orderNumber" | "email">) {
-  if (data.orderNumber) {
-    const [order] = await db
-      .select()
-      .from(orders)
-      .where(eq(orders.orderNumber, data.orderNumber.trim()))
-      .limit(1);
-    if (order) return order;
+async function resolveOrderByNumber(orderNumber?: string) {
+  if (!orderNumber?.trim()) return null;
+  const [order] = await db
+    .select()
+    .from(orders)
+    .where(eq(orders.orderNumber, orderNumber.trim()))
+    .limit(1);
+  return order ?? null;
+}
+
+async function upsertOntwerpdetailsLead(data: NormalizedFormData, customer: { id: number }) {
+  const [recentLead] = await db
+    .select()
+    .from(leads)
+    .where(eq(leads.customerId, customer.id))
+    .orderBy(desc(leads.createdAt))
+    .limit(1);
+
+  const block = `\n\n--- Ontwerpdetails (${new Date().toLocaleString("nl-NL")}) ---\n${buildLeadDescription(data)}`;
+
+  if (recentLead) {
+    await db
+      .update(leads)
+      .set({
+        description: `${recentLead.description ?? ""}${block}`.trim(),
+        rawPayload: buildRawPayload(data),
+        updatedAt: new Date().toISOString(),
+      })
+      .where(eq(leads.id, recentLead.id));
+    return recentLead;
   }
 
-  if (data.email) {
-    const [customer] = await db
-      .select()
-      .from(customers)
-      .where(eq(customers.email, data.email))
-      .limit(1);
-    if (!customer) return null;
+  const [lead] = await db
+    .insert(leads)
+    .values({
+      customerId: customer.id,
+      source: "website",
+      title: data.title?.trim() || "Ontwerpdetails via website",
+      description: buildLeadDescription(data),
+      rawPayload: buildRawPayload(data),
+      status: "new",
+    })
+    .returning();
+  return lead;
+}
 
-    const [order] = await db
-      .select()
-      .from(orders)
-      .where(eq(orders.customerId, customer.id))
-      .orderBy(desc(orders.createdAt))
-      .limit(1);
-    return order ?? null;
+export async function processOntwerpdetailsForm(data: NormalizedFormData) {
+  const customer = data.email ? await findOrCreateCustomer(data) : null;
+  const lead = customer ? await upsertOntwerpdetailsLead(data, customer) : null;
+
+  const order = await resolveOrderByNumber(data.orderNumber);
+
+  if (order) {
+    await upsertWorkInstructionForOrder(order.id, data);
+
+    await db.insert(tasks).values({
+      title: "Ontwerpdetails ontvangen — werkbon controleren",
+      description: `Order ${order.orderNumber} — formulier ingevuld via website`,
+      orderId: order.id,
+      leadId: lead?.id,
+      priority: "high",
+      isAutomatic: true,
+    });
+
+    await logActivity({
+      entityType: "order",
+      entityId: order.id,
+      action: "webhook_ontwerpdetails",
+      toValue: "website",
+    });
+  } else {
+    await db.insert(tasks).values({
+      title: "Ontwerpdetails — koppel aan order",
+      description: [
+        data.orderNumber ? `Ordernummer: ${data.orderNumber}` : null,
+        data.email ? `E-mail: ${data.email}` : null,
+        data.name ? `Naam: ${data.name}` : null,
+        "Formulier ontvangen. Controleer aanvraag en koppel handmatig aan order indien nodig.",
+      ]
+        .filter(Boolean)
+        .join("\n"),
+      leadId: lead?.id,
+      priority: "high",
+      isAutomatic: true,
+    });
   }
 
-  return null;
+  if (customer) {
+    await createInboxEntryWithDraft({
+      body: buildLeadDescription(data),
+      subject: data.title?.trim() || "Ontwerpdetails via website",
+      channel: "website_ontwerpdetails",
+      customerId: customer.id,
+      customerName: customer.name ?? data.name,
+      customerEmail: customer.email ?? data.email,
+      leadId: lead?.id,
+      leadTitle: lead?.title ?? data.title,
+    });
+  }
+
+  revalidateWebhookPages();
+
+  return {
+    formType: "ontwerpdetails" as const,
+    linked: order ? ("order" as const) : ("lead" as const),
+    leadId: lead?.id ?? null,
+    orderId: order?.id ?? null,
+    orderNumber: order?.orderNumber ?? data.orderNumber ?? null,
+    message: order
+      ? "Ontwerpdetails gekoppeld aan order en aanvraag bijgewerkt."
+      : "Ontwerpdetails opgeslagen als aanvraag.",
+  };
 }
 
 function buildRawPayload(data: NormalizedFormData) {
@@ -234,112 +318,6 @@ export async function processAanvraagForm(data: NormalizedFormData) {
     formType: "aanvraag" as const,
     leadId: lead.id,
     customerId: customer.id,
-  };
-}
-
-export async function processOntwerpdetailsForm(data: NormalizedFormData) {
-  const order = await resolveOrder(data);
-
-  if (order) {
-    await upsertWorkInstructionForOrder(order.id, data);
-
-    await db.insert(tasks).values({
-      title: "Ontwerpdetails ontvangen — werkbon controleren",
-      description: `Order ${order.orderNumber} — formulier ingevuld via website`,
-      orderId: order.id,
-      priority: "high",
-      isAutomatic: true,
-    });
-
-    await logActivity({
-      entityType: "order",
-      entityId: order.id,
-      action: "webhook_ontwerpdetails",
-      toValue: "website",
-    });
-
-    revalidateWebhookPages();
-
-    return {
-      formType: "ontwerpdetails" as const,
-      orderId: order.id,
-      orderNumber: order.orderNumber,
-      linked: "order" as const,
-    };
-  }
-
-  const customer = data.email ? await findOrCreateCustomer(data) : null;
-
-  let leadId: number | null = null;
-  if (customer) {
-    const [recentLead] = await db
-      .select()
-      .from(leads)
-      .where(eq(leads.customerId, customer.id))
-      .orderBy(desc(leads.createdAt))
-      .limit(1);
-
-    if (recentLead) {
-      leadId = recentLead.id;
-      await db
-        .update(leads)
-        .set({
-          description: `${recentLead.description ?? ""}\n\n--- Ontwerpdetails (wacht op order) ---\n${buildLeadDescription(data)}`.trim(),
-          rawPayload: buildRawPayload(data),
-          updatedAt: new Date().toISOString(),
-        })
-        .where(eq(leads.id, recentLead.id));
-    } else {
-      const [lead] = await db
-        .insert(leads)
-        .values({
-          customerId: customer.id,
-          source: "website",
-          title: "Ontwerpdetails (nog geen order)",
-          description: buildLeadDescription(data),
-          rawPayload: buildRawPayload(data),
-          status: "new",
-        })
-        .returning();
-      leadId = lead.id;
-    }
-  }
-
-  await db.insert(tasks).values({
-    title: "Ontwerpdetails — koppel aan order",
-    description: [
-      data.orderNumber ? `Ordernummer: ${data.orderNumber}` : null,
-      data.email ? `E-mail: ${data.email}` : null,
-      data.name ? `Naam: ${data.name}` : null,
-      "Formulier ontvangen maar geen order gevonden. Handmatig koppelen.",
-    ]
-      .filter(Boolean)
-      .join("\n"),
-    leadId: leadId ?? undefined,
-    priority: "high",
-    isAutomatic: true,
-  });
-
-  await createInboxEntryWithDraft({
-    body: buildLeadDescription(data),
-    subject: "Ontwerpdetails via website",
-    channel: "website_ontwerpdetails",
-    customerId: customer?.id,
-    customerName: customer?.name ?? data.name,
-    customerEmail: customer?.email ?? data.email,
-    leadId: leadId ?? undefined,
-    leadTitle: data.title ?? undefined,
-  });
-
-  revalidateWebhookPages();
-
-  return {
-    formType: "ontwerpdetails" as const,
-    linked: "pending" as const,
-    leadId,
-    orderNumber: data.orderNumber ?? null,
-    message:
-      "Ontwerpdetails opgeslagen. Geen order gevonden — taak aangemaakt voor koppeling.",
   };
 }
 

@@ -11,7 +11,7 @@ const IGNORED_FORM_IDS = new Set([
 
 const CONTACT_FORM_IDS = new Set(["51", "4257", "3651"]);
 
-const ONTWERP_FORM_IDS = new Set(["465", "5960"]);
+const ONTWERP_FORM_IDS = new Set(["18", "465", "5960"]);
 
 const AANVRAAG_FORM_IDS = new Set([
   "86",
