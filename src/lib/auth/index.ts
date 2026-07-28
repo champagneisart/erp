@@ -1,12 +1,16 @@
 import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
-import bcrypt from "bcryptjs";
-import { eq } from "drizzle-orm";
-import { db } from "@/lib/db";
-import { users } from "@/db/schema";
 
-export const { handlers, auth, signIn, signOut } = NextAuth({
-  secret: process.env.AUTH_SECRET?.trim(),
+function authSecret() {
+  return (
+    process.env.AUTH_SECRET?.trim() ||
+    process.env.NEXTAUTH_SECRET?.trim() ||
+    ""
+  );
+}
+
+export const { handlers, auth, signIn, signOut } = NextAuth(() => ({
+  secret: authSecret(),
   trustHost: true,
   session: { strategy: "jwt" },
   pages: { signIn: "/login" },
@@ -21,6 +25,13 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         const email = credentials?.email as string | undefined;
         const password = credentials?.password as string | undefined;
         if (!email || !password) return null;
+
+        const [{ db }, { users }, bcrypt, { eq }] = await Promise.all([
+          import("@/lib/db"),
+          import("@/db/schema"),
+          import("bcryptjs"),
+          import("drizzle-orm"),
+        ]);
 
         const [user] = await db
           .select()
@@ -57,4 +68,4 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       return session;
     },
   },
-});
+}));
