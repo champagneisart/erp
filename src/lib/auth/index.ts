@@ -4,10 +4,12 @@ import bcrypt from "bcryptjs";
 import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { users } from "@/db/schema";
-import { authConfig } from "@/lib/auth/auth.config";
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
-  ...authConfig,
+  secret: process.env.AUTH_SECRET,
+  trustHost: true,
+  session: { strategy: "jwt" },
+  pages: { signIn: "/login" },
   providers: [
     Credentials({
       name: "credentials",
@@ -39,4 +41,20 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       },
     }),
   ],
+  callbacks: {
+    jwt({ token, user }) {
+      if (user) {
+        token.id = user.id;
+        token.role = user.role;
+      }
+      return token;
+    },
+    session({ session, token }) {
+      if (session.user) {
+        session.user.id = token.id as string;
+        session.user.role = token.role as "admin" | "staff" | "artist";
+      }
+      return session;
+    },
+  },
 });
